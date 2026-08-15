@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dip-lomacy | Tendie vs Dimmie</title>
+  <meta name="description" content="A deliberately dumb, addictive global sauce dipping war between Tendie and Dimmie.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bungee+Shade&family=Plus+Jakarta+Sans:wght@400;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="app-header">
+      <h1 class="logo">DIP-LOMACY</h1>
+      <p class="tagline">The Global Sauce War</p>
+    </header>
+
+    <!-- Live War Tug-of-War Bar -->
+    <div class="war-banner">
+      <div class="war-lead-badge" id="warLeadBadge">DEAD HEAT</div>
+      <div class="war-progress-track">
+        <div class="war-progress-bar tendie-bar" id="tendieBar" style="width: 50%;"></div>
+        <div class="war-progress-bar dimmie-bar" id="dimmieBar" style="width: 50%;"></div>
+      </div>
+      <div class="war-scores-row">
+        <div class="score-pill tendie-pill">
+          <span class="pill-name">TENDIE</span>
+          <span class="pill-val" id="todayTendie">0</span>
+        </div>
+        <div class="score-vs">VS</div>
+        <div class="score-pill dimmie-pill">
+          <span class="pill-name">DIMMIE</span>
+          <span class="pill-val" id="todayDimmie">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arena Stage -->
+    <main class="arena">
+      <!-- Tendie Side Stage -->
+      <div class="faction-stage tendie-stage" id="stageTendie" role="button" tabindex="0" aria-label="Dip Tendie in Ranch">
+        <div class="sauce-vessel-container tendie-vessel">
+          <div class="sauce-bowl-graphic ranch-bowl">
+            <div class="sauce-surface ranch-surface"></div>
+            <div class="splash-particles" id="splashTendie"></div>
+          </div>
+        </div>
+        <div class="mascot-rig tendie-rig" id="rigTendie">
+          <div class="svg-container" id="svgTendieContainer"></div>
+        </div>
+        <div class="stage-footer">
+          <div class="currency-label">Good Boy Points</div>
+          <div class="faction-action">TAP TO DIP TENDIE</div>
+        </div>
+      </div>
+
+      <!-- Dimmie Side Stage -->
+      <div class="faction-stage dimmie-stage" id="stageDimmie" role="button" tabindex="0" aria-label="Dip Dimmie in Vinegar">
+        <div class="sauce-vessel-container dimmie-vessel">
+          <div class="sauce-bowl-graphic vinegar-bowl">
+            <div class="sauce-surface vinegar-surface"></div>
+            <div class="splash-particles" id="splashDimmie"></div>
+          </div>
+        </div>
+        <div class="mascot-rig dimmie-rig" id="rigDimmie">
+          <div class="svg-container" id="svgDimmieContainer"></div>
+        </div>
+        <div class="stage-footer">
+          <div class="currency-label">Respect Points</div>
+          <div class="faction-action">TAP TO DIP DIMMIE</div>
+        </div>
+      </div>
+    </main>
+
+    <!-- Global Lifetime Stats -->
+    <footer class="app-footer">
+      <div class="alltime-stat tendie-stat">
+        <span class="stat-num" id="lifeTendie">0</span>
+        <span class="stat-lbl">Tendie Lifetime Dips</span>
+      </div>
+      <div class="alltime-stat dimmie-stat">
+        <span class="stat-num" id="lifeDimmie">0</span>
+        <span class="stat-lbl">Dimmie Lifetime Dips</span>
+      </div>
+    </footer>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
