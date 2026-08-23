@@ -6,6 +6,10 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+  "routes": [
+    { "pattern": "dip-lomacy.com", "custom_domain": true },
+    { "pattern": "www.dip-lomacy.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS"
@@ -21,7 +25,7 @@
   "migrations": [
     {
       "tag": "v1",
-      "new_classes": [
+      "new_sqlite_classes": [
         "GlobalWarDO"
       ]
     }

@@ -63,8 +63,7 @@ body {
 .logo {
   font-family: "Bungee Shade", cursive;
   font-size: clamp(2rem, 5vw, 4rem);
-  color: var(--tendie-gold);
-  text-shadow: 3px 3px 0px var(--tendie-gold-dark);
+  color: #0a0a0a;
   letter-spacing: 2px;
   line-height: 1.1;
 }
@@ -244,86 +243,48 @@ body {
   display: block;
 }
 
-/* Dip Downward Arc Animation */
-.mascot-rig.dipping-tendie {
-  animation: dipArcTendie 0.30s cubic-bezier(0.2, 0.8, 0.2, 1);
+/* Gloopy drool/drip and ginger shimmy (the arc dip itself is driven by dip.ts on the
+   SVG internals, not here). */
+@keyframes gloop {
+  0%, 100% { transform: translateY(0) scaleY(1) scaleX(1); }
+  50%      { transform: translateY(7px) scaleY(1.22) scaleX(0.92); }
+}
+.glooping {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: gloop 1.5s ease-in-out infinite;
 }
 
-.mascot-rig.dipping-dimmie {
-  animation: dipArcDimmie 0.30s cubic-bezier(0.2, 0.8, 0.2, 1);
+@keyframes gingerJiggle {
+  0%   { transform: rotate(0) translateY(0); }
+  18%  { transform: rotate(-7deg) translateY(-2px); }
+  42%  { transform: rotate(6deg) translateY(1px); }
+  68%  { transform: rotate(-3deg); }
+  100% { transform: rotate(0); }
+}
+.ginger-jiggle {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: gingerJiggle 0.5s ease-out;
 }
 
-@keyframes dipArcTendie {
-  0% { transform: rotate(0deg) translateY(0); }
-  45% { transform: rotate(14deg) translateY(42px) scale(0.97); }
-  100% { transform: rotate(0deg) translateY(0); }
-}
-
-@keyframes dipArcDimmie {
-  0% { transform: rotate(0deg) translateY(0); }
-  45% { transform: rotate(-14deg) translateY(42px) scale(0.97); }
-  100% { transform: rotate(0deg) translateY(0); }
-}
-
-/* Sauce Bowl & Splash */
-.sauce-vessel-container {
-  position: absolute;
-  bottom: 80px;
-  width: 180px;
-  height: 60px;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  pointer-events: none;
-}
-
-.sauce-bowl-graphic {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  position: relative;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.2);
-}
-
-.ranch-bowl {
-  background: #e2e8f0;
-  border: 4px solid #cbd5e1;
-}
-
-.ranch-surface {
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #ffffff 0%, #f1f5f9 100%);
-  border: 2px solid #e2e8f0;
-}
-
-.vinegar-bowl {
-  background: #1c1917;
-  border: 4px solid #44403c;
-}
-
-.vinegar-surface {
-  position: absolute;
-  inset: 4px;
-  border-radius: 50%;
-  background: radial-gradient(circle, #292524 0%, #0c0a09 100%);
-  border: 2px solid #1c1917;
-}
-
-/* Splash Particle Spawner */
+/* Splash particle spawner (sits over the bowl at the base of the mascot; the bowl itself
+   is now the mascot SVG's own vector bowl, no fake HTML bowl). */
 .splash-particles {
   position: absolute;
-  top: 50%;
+  bottom: 20%;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
   pointer-events: none;
-  width: 100%;
-  height: 100%;
+  width: 50%;
+  height: 30%;
+  z-index: 5;
 }
 
 .splash-drop {
   position: absolute;
+  top: 50%;
+  left: 50%;
   width: 8px;
   height: 8px;
   border-radius: 50%;

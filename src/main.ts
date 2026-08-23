@@ -1,4 +1,5 @@
 // Dip-lomacy Front-End Engine
+import { initDip, triggerDip } from './dip';
 
 interface WarState {
   lifeTendie: number;
@@ -17,10 +18,6 @@ const state: WarState = {
 let ws: WebSocket | null = null;
 let audioCtx: AudioContext | null = null;
 
-// Lockouts for 300ms animation cycle
-let tendieLockout = false;
-let dimmieLockout = false;
-
 const fmt = (n: number) => Math.round(n).toLocaleString('en-GB');
 
 // DOM Elements
@@ -34,8 +31,6 @@ const elDimmieBar = document.getElementById('dimmieBar')!;
 
 const elStageTendie = document.getElementById('stageTendie')!;
 const elStageDimmie = document.getElementById('stageDimmie')!;
-const elRigTendie = document.getElementById('rigTendie')!;
-const elRigDimmie = document.getElementById('rigDimmie')!;
 
 const elSplashTendie = document.getElementById('splashTendie')!;
 const elSplashDimmie = document.getElementById('splashDimmie')!;
@@ -54,36 +49,11 @@ async function loadArt() {
     document.getElementById('svgTendieContainer')!.innerHTML = tendieSvgText;
     document.getElementById('svgDimmieContainer')!.innerHTML = dimmieSvgText;
 
-    setupFacialExpressions();
+    const tendieSvg = document.querySelector('#svgTendieContainer svg') as SVGSVGElement | null;
+    const dimmieSvg = document.querySelector('#svgDimmieContainer svg') as SVGSVGElement | null;
+    if (tendieSvg && dimmieSvg) initDip(tendieSvg, dimmieSvg);
   } catch (err) {
     console.error('Failed loading SVG art:', err);
-  }
-}
-
-// Facial Expression Switching Engine
-function setupFacialExpressions() {
-  updateExpressions();
-}
-
-function updateExpressions() {
-  const tendieLeading = state.todayTendie >= state.todayDimmie;
-
-  // Dimmie Faces in XLB.svg: XLB_Face_Happy, XLB_Face_Worried, XLB_Face_Begging, XLB_Face_Stunned
-  const dimmieHappy = document.getElementById('XLB_Face_Happy');
-  const dimmieWorried = document.getElementById('XLB_Face_Worried');
-  const dimmieBegging = document.getElementById('XLB_Face_Begging');
-
-  if (dimmieHappy && dimmieWorried) {
-    if (!tendieLeading) {
-      // Dimmie is winning -> Smug/Happy
-      dimmieHappy.style.display = 'block';
-      dimmieWorried.style.display = 'none';
-      if (dimmieBegging) dimmieBegging.style.display = 'none';
-    } else {
-      // Dimmie is losing -> Worried
-      dimmieHappy.style.display = 'none';
-      dimmieWorried.style.display = 'block';
-    }
   }
 }
 
@@ -141,36 +111,21 @@ function spawnSplashParticles(container: HTMLElement, isRanch: boolean) {
 
 // Dip Action Triggers
 function performDip(side: 'tendie' | 'dimmie') {
+  // Optimistic count and responsive feedback on the tap; the visual dip runs on top and
+  // restarts if you tap again mid-swing, so rapid dipping stays snappy.
   if (side === 'tendie') {
-    if (tendieLockout) return;
-    tendieLockout = true;
-    setTimeout(() => (tendieLockout = false), 300);
-
-    elRigTendie.classList.remove('dipping-tendie');
-    void elRigTendie.offsetWidth; // Force reflow
-    elRigTendie.classList.add('dipping-tendie');
-
-    setTimeout(() => spawnSplashParticles(elSplashTendie, true), 120);
-    playBlop(true);
-
     state.todayTendie += 1;
     state.lifeTendie += 1;
+    playBlop(true);
+    spawnSplashParticles(elSplashTendie, true);
   } else {
-    if (dimmieLockout) return;
-    dimmieLockout = true;
-    setTimeout(() => (dimmieLockout = false), 300);
-
-    elRigDimmie.classList.remove('dipping-dimmie');
-    void elRigDimmie.offsetWidth;
-    elRigDimmie.classList.add('dipping-dimmie');
-
-    setTimeout(() => spawnSplashParticles(elSplashDimmie, false), 120);
-    playBlop(false);
-
     state.todayDimmie += 1;
     state.lifeDimmie += 1;
+    playBlop(false);
+    spawnSplashParticles(elSplashDimmie, false);
   }
 
+  triggerDip(side);
   updateUI();
 
   // Send to WebSocket
@@ -206,7 +161,6 @@ function updateUI() {
     elWarLeadBadge.style.color = '#dc2626';
   }
 
-  updateExpressions();
 }
 
 // Setup WebSocket Connection

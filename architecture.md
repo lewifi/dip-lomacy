@@ -1,7 +1,7 @@
 # Dip-lomacy: architecture
 
-Version: 0.4.3
-Updated: 2026-08-15 13:15 AEST
+Version: 0.6.0
+Updated: 2026-08-15 16:28 AEST
 
 Living decision log for the build. The full product brief lives in the handover
 document; this file records what we have actually decided and why, plus the
@@ -198,6 +198,45 @@ Three tiers, by role:
   Fonts, for speed and to keep the page free of third-party requests. The demo uses the
   Google Fonts link for convenience.
 
+### Dip animation (finalised in the sauce tuner)
+
+Built and tuned in a throwaway workbench (`assets/diptuner.html`, served by `serve.mjs`),
+to be deleted once baked into the real app. The rig and both presets are locked.
+
+Rig (shared structure, per mascot):
+
+- Each dipping group is an **outer** element carrying a fixed **reverse-cutout clip** at
+  the sauce line, with an **inner rotor** doing the arc rotate. The food swings on the
+  off-frame pivot while the sauce line stays level, and anything below the line is cut
+  away, revealing the bowl's own sauce and garnish. No sauce overlay: nothing is obscured,
+  and the sauce is whatever colour the bowl art is.
+- The bowl stays put. Everything except the bowl dips. (Tendie's bowl group was the one
+  misnamed `#dip`, now renamed `#bowl`; Dimmie's is `#Vinegar_Bowl`.)
+- **Secondary centre-spin** layered on the arc: Tendie's tender spins from the thumb's
+  grip (top origin, so it dangles without clipping past the thumb); Dimmie's chopsticks
+  spin from their centre.
+- **Ginger** slivers (`#Ginger*`) shimmy on impact. **Gloopy drips** bob idle: Dimmie's
+  `#Drip` at the chin, and Tendie's ranch drool (cloned from `#Drip`, recoloured cream,
+  hung behind `#tongue` at his upper lip, "messy bastard"). **Splash** droplets fly out
+  and stain the table, fading; stains fade centre-to-edge.
+
+Locked presets (viewBox-unit pivots, ms timings):
+
+    DIP_TENDIE = { pivot:[-1200,1338], angle:8, anticipation:4, overshoot:6, secondSpin:16,
+      antMs:162, downMs:60, holdMs:232, upMs:224,
+      splash:{drops:40,power:240,fadeS:10}, wave:{line:44,amp:47,rise:70},
+      drool:[-8,-32], droolScale:[0.338,0.45] }
+
+    DIP_DIMMIE = { pivot:[1922,788], angle:-21, anticipation:3, overshoot:6, secondSpin:11,
+      antMs:260, downMs:480, holdMs:171, upMs:321,
+      splash:{drops:12,power:68,fadeS:7}, wave:{line:75,amp:22,rise:70} }
+
+Note: the **wave (sauce line / amp) is per-mascot**, not a shared constant, the two bowls
+sit at different heights. The bake must keep these separate.
+
+Correction to an earlier note: Tendie's SVG is *not* missing a sauce cup, it was the group
+misnamed `#dip` (now `#bowl`), so no ranch-cup asset needs drawing.
+
 ## 7. Decisions locked
 
 - Names: Tendie (left), Dimmie (right). Code spelling `tendie` / `dimmie`.
@@ -222,9 +261,27 @@ Three tiers, by role:
 - Broadcast is a throttled aggregate (target ~10 Hz), not one message per dip, so the
   DO survives the viral case. Counters stay exact; only the wire is throttled. Client
   increments its own dip optimistically and reconciles to server truth on each tick.
-- **No hard reset: one perpetual war that runs forever**, totals just accumulate. How
-  to keep a runaway-lead war feeling live is a known open question, deferred (see
-  section 8).
+- **No hard reset: one perpetual war.** Permanent records never reset. Three-tier
+  scoreboard, each answering a different question:
+  - **Sauce Bowls won** (titles / rings): who is winning the war over time. The primary
+    competitive metric, and healthier than raw dips (a title must be won across a whole
+    Bowl period, so it is hard to bot and gives the underdog a clean path: "14 rings to
+    your 11" even while behind on lifetime).
+  - **This Bowl's tug-of-war**: who is winning right now. The live, winnable contest.
+  - **Lifetime dips**: the raw forever number ("the damage"), feeds milestones and the
+    ever-degrading mascots.
+- **The Sauce Bowl is a periodic championship event** (weekly-ish), not just the live
+  bar. At period end a DO alarm crowns the leader, increments their title tally, and the
+  current-Bowl scores reset to 0-0 for the next Bowl. This is not a wipe: lifetime dips
+  and titles are permanent, only each match starts fresh, the way every match does. It
+  is also the answer to keeping the war live: every Bowl is a fresh winnable contest
+  regardless of the lifetime gap.
+- Backend shape: the DO tracks lifetime totals, current-Bowl scores, and title tallies,
+  and derives/sends the standing in the tick (per native guardrail 2: server derives,
+  clients render). Bowl rollover via a DO alarm.
+- **Freeware, no monetisation for now.** No ads, no IAP, no paywall. Cosmetics are
+  bought with in-game points, never money. (Also moots the app-store revenue cut if a
+  native build happens.)
 
 ## 8. Open questions
 
@@ -234,11 +291,9 @@ Three tiers, by role:
 2. **Identity and persistence.** Confirm localStorage-only is acceptable for launch
    (cleared cache wipes streak and points, no cross-device), or bring the anonymous
    KV id in from the start.
-3. **Keeping a forever war live (deferred).** No reset means a purely cumulative war
-   goes stale once one side banks an uncatchable lead. Likely fix to look into later:
-   keep lifetime totals forever (milestones, evolutions, all-time scoreboard) but drive
-   the live "who's winning" (faces, trash talk, momentum) off a rolling recent window
-   (e.g. last 24h), so the daily fight stays winnable without ever wiping anything.
+3. **Sauce Bowl period length.** The "keep-it-live" question is now resolved by the
+   Sauce Bowl event structure (section 7). Remaining knob: how long a Bowl runs. Long
+   enough that a title feels earned (weekly-ish); too frequent makes rings cheap.
 4. **Broadcast tick rate.** Confirm ~10 Hz aggregate is the right feel versus
    something slower.
 
