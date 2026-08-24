@@ -1,7 +1,7 @@
 # Dip-lomacy: architecture
 
-Version: 0.6.0
-Updated: 2026-08-15 16:28 AEST
+Version: 0.8.0
+Updated: 2026-08-25 03:55 AEST
 
 Living decision log for the build. The full product brief lives in the handover
 document; this file records what we have actually decided and why, plus the
@@ -24,10 +24,10 @@ snacks. Hold them light.
 - **Tendie**: the left mascot, a breaded chicken tender held by a bare cartoon arm,
   dipped into ranch. Golden-retriever energy. Currency: good boy points (see
   section 3).
-- **Dimmie**: the right mascot, a dumpling held by chopsticks, dipped into dark
-  vinegar. Quiet menace, a personal code. Name is Aussie slang from "dim sim", so it
-  reads as the food and geolocates the nickname to Australia rather than pinning the
-  side to a country. Currency: respect (see section 3).
+- **Dimmie**: the right mascot, a dumpling held by chopsticks, dipped into authentic
+  Shanghainese red vinegar with julienned ginger. Quiet menace, a personal code. Name is
+  Aussie slang from "dim sim", so it reads as the food and geolocates the nickname to
+  Australia rather than pinning the side to a country. Currency: respect (see section 3).
 - Left is Tendie, right is Dimmie, fixed, so they square up against each other.
 - Canonical spelling in code is **tendie** (not "tendy"), one spelling per side.
 - Counters and faction keys: `tendie_dips`, `dimmie_dips`, `tendie`, `dimmie`.
@@ -88,22 +88,22 @@ styles and soggy food instead of at anybody real. Win win.
 
 ## 4. Tech stack
 
-Cloudflare-native, matching the owner's existing Worker projects (trash-can,
-file-share). See **Part II (§10–17)** for the full as-built detail; this is the
-shape.
+Cloudflare-native edge architecture, matching the owner's standard Worker stack (ephix pulse,
+trash-can, file-share). See **Part II (§10–18)** for the full as-built detail; this is the
+summary shape:
 
-- Cloudflare Worker serves the API and, via the `assets` binding, the single
-  baked-in HTML page (`src/index.ts`, Hono router).
-- One Durable Object (`GlobalWarDO`, SQLite-backed) holds authoritative global state,
-  runs the anti-bot gate, fans out throttled totals, and emits live `world_dip`
-  events over WebSocket.
-- Dynamic OG share card rendered on the edge with `workers-og` (`src/og.ts`).
-- **No Vite.** The front end is a single hand-authored `assets/arena.html` with the
-  two mascot SVGs inlined at build time by `build-arena.mjs` → `dist/index.html`.
-  Vanilla JS/CSS, no framework, no bundler.
-- npm, single lockfile. `nodejs_compat`. Deploy is a **direct `wrangler deploy`**
-  (build the HTML, then deploy) — no GitHub CI in the loop.
-- Per-player state (faction) in localStorage. Global scores live only in the DO.
+- **Compute & Routing:** Cloudflare Worker running TypeScript and the Hono router
+  (`src/index.ts`).
+- **State & Real-time:** A single global SQLite-backed Cloudflare Durable Object
+  (`GlobalWarDO`, `src/durable_object.ts`), orchestrating authoritative global scores,
+  weekly resets, anti-bot validation, and real-time WebSocket broadcast.
+- **Edge OG Card Generation:** Edge-rendered PNG card via `workers-og` / Satori
+  (`src/og.ts`) reading live DO scores.
+- **Front End:** Single canonical file `arena.html`
+  compiled into `dist/index.html` by `build-arena.mjs`. Zero frameworks, zero bundlers, pure
+  vanilla HTML5, CSS3, and JavaScript with HTML5 Canvas physics and Web Audio API.
+- **Deployment:** Direct Cloudflare Wrangler deployment (`npx wrangler deploy`) targeting
+  custom domains `dip-lomacy.com` and `www.dip-lomacy.com`.
 
 ## 5. Repo layout
 
@@ -438,57 +438,65 @@ philosophy is generous to a frantic human (a high-energy clicker profile) but
 unforgiving to mechanically regular timing. All limits are tunable constants at the
 top of `durable_object.ts`.
 
-## 14. Global live dips (`world_dip`)
+## 14. Global live dips & Leaderboard (`world_dip`)
 
 When a dip passes the gate, the DO fans a `world_dip` event out to every *other*
 socket. The front end renders each as a short-lived floating bubble (the
 `bubbleFloat` animation) tinted to the dipping side and tagged with the origin
-country/city, plus a live ticker with a pulsing dot. Effect: the arena feels
-inhabited — you watch dips landing from around the world in real time, not just a
-number ticking. This is separate from and faster than the aggregated `tick`.
+country/city, plus a live ticker with a pulsing dot.
+
+In addition, clicking the **Leaderboard badge** in the footer or HQ menu opens a
+modal displaying the top-50 global dipping nations with flags, rank badges
+(🥇, 🥈, 🥉), dip totals, and percentage progress bars.
 
 ## 15. Dynamic OG share card (`src/og.ts`)
 
 A 1200×630 PNG rendered on the edge with `workers-og` (Satori + resvg-wasm),
-composed via `React.createElement` (no JSX build step). Adapted from the owner's
-proven ephix.net share-card worker.
+composed via `React.createElement` (no JSX build step).
 
 - Reads **live scores** from the DO, so the card always shows the current
   tug-of-war, all-time score, weeks-won, and week label.
-- **Mascots**: `tendie_og.png` / `dimmie_og.png` loaded from the `ASSETS` binding
-  once per isolate, cached as base64 data URIs, flanking the card.
-- **Fonts**: Bungee Shade (title) + Space Mono (chrome) fetched from the jsDelivr
-  Fontsource CDN, cached per isolate.
-- Wood-grain background, centre tug-of-war bar with live percentages, tagline
-  "WHO WILL GET GOOD BOY POINTS?", `DIP-LOMACY.COM` badge.
-- `Cache-Control: max-age=300, s-maxage=600` — fresh enough to feel live, cached
-  enough to survive a share storm. Errors return JSON 500 (debuggable) rather than a
-  broken image.
-
-`arena.html` points `og:image` / `twitter:image` at `/api/og`.
+- **Mascots**: `tendie_og.png` / `dimmie_og.png` sized up to 560×620 on the flanks.
+- **Header**: Single-line 66px Bungee Shade title with tagline.
+- `Cache-Control: max-age=300, s-maxage=600`.
 
 ## 16. Favicon
 
 `public/assets/favicon.svg` — Dimmie's happy face cropped to
-`viewBox="620 340 820 600"` (Main_Dumpling + `XLB_Face_Happy` with the needed style
-defs). Referenced as `<link rel="icon" type="image/svg+xml" href="/favicon.svg">`;
-`build-arena.mjs` copies it to `dist/`.
+`viewBox="620 340 820 600"`. `build-arena.mjs` copies it to `dist/`.
 
-## 17. Mobile & front-end polish (`arena.html`)
+## 17. Front-end architecture & retention systems (`arena.html`)
 
-- `viewport-fit=cover`, `100dvh`, `touch-action: manipulation`, `safe-area-inset`
-  padding so the layout survives notches and mobile browser chrome.
-- Pull-to-refresh indicator; faction label pills lifted to sit just above the footer.
-- Live ticker (pulsing dot) and the floating `world_dip` bubbles (§14).
-- "made by ephix" pulse link → ephix.net in the all-time footer.
-- Two SVGs are inlined into one document, so their internal CSS is **namespaced**
-  (`tst`/`dst` class prefixes, baked into the SVGs in `public/assets/`) to stop the
-  two stylesheets colliding.
+- **Snack War HQ Menu & Line-Art Burger Button**:
+  - Vector line-art burger icon in the top-right header across desktop and mobile.
+  - Tapping opens the **Snack War HQ modal**, housing the live weekly countdown timer,
+    weeks-won tally, nations leaderboard trigger, lore, and player dossier.
+- **Weekly Reset Live Countdown**:
+  - Ticks live every second to Monday 00:00 UTC in both the desktop footer and the HQ menu.
+- **Retention & Local Player Dossier (Zero Login)**:
+  - **Daily Streak Engine**: Tracks consecutive active dipping days via `localStorage`
+    (`🔥 X Day Streak`).
+  - **Military Snack Ranks**: Tracks personal lifetime dips across both sides, awarding
+    goofy ranks (`🥣 Sauce Cadet` → `🥢 Sauce Veteran` → `🎖️ Dipping Specialist` →
+    `🥋 Master Dipper` → `👑 Grand Snack Diplomat` → `💎 GBP Mogul`) with promotion toasts.
+  - **"Share My Contribution" Flex**: One-tap native Web Share / clipboard copy sharing
+    personal dips, rank, streak, and live war percentage.
+- **Battle Scars / Persistent Sauce Stains**:
+  - Drops have a chance to dry permanently onto the wooden table planks (max 50, baked into
+    canvas arc batches, 0ms CPU overhead).
+- **Mobile Touch Handling & Anti-Flicker**:
+  - Full `viewport-fit=cover` and safe-area insets (`max(24px, calc(12px + env(safe-area-inset-bottom)))`).
+  - Top downward drag gesture (>90px) triggers pull-to-refresh while keeping tap events
+    instantaneous with zero delay.
+  - Clean 2D GPU compositing preventing compositor micro-stuttering.
+  - Symmetrical vertical stage centering for Tendie and Dimmie with lifted pills.
 
 ## 18. Build & deploy
 
-    npm run build   # node build-arena.mjs  → dist/index.html (+ assets, favicon)
-    npx wrangler deploy
+```powershell
+npm run build   # node build-arena.mjs -> dist/index.html (+ assets, favicon)
+npx wrangler deploy
+```
 
 Direct deploy, no GitHub CI. `wrangler.jsonc` binds the custom domains
 `dip-lomacy.com` / `www.dip-lomacy.com`, the `GlobalWarDO` (SQLite migration), the
