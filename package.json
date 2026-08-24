@@ -5,11 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "build": "vite build",
-    "deploy": "vite build && wrangler deploy"
+    "build": "node build-arena.mjs",
+    "deploy": "node build-arena.mjs && wrangler deploy"
   },
   "dependencies": {
-    "hono": "^4.7.2"
+    "hono": "^4.7.2",
+    "react": "^19.2.8",
+    "workers-og": "^0.0.27"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250214.0",

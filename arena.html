@@ -1,0 +1,1496 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Dip-lomacy · The Global Snack War</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Dip-lomacy · The Global Snack War">
+<meta property="og:description" content="Pick a side. Dip your snack. Watch the world fight over who's winning.">
+<meta property="og:image" content="https://dip-lomacy.com/api/og">
+<meta property="og:url" content="https://dip-lomacy.com">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Dip-lomacy · The Global Snack War">
+<meta name="twitter:description" content="Pick a side. Dip your snack. Watch the world fight over who's winning.">
+<meta name="twitter:image" content="https://dip-lomacy.com/api/og">
+<link href="https://fonts.googleapis.com/css2?family=Bungee+Shade&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+*{ box-sizing:border-box; margin:0; padding:0; }
+html,body{
+  width:100%; height:100%; height:100dvh;
+  overflow:hidden; position:fixed; inset:0;
+  touch-action:manipulation; -webkit-tap-highlight-color:transparent;
+}
+body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:none; }
+
+/* ---- Table with perspective planks ---- */
+.arena{
+  position:relative; width:100%; height:100%; height:100dvh; overflow:hidden;
+  background: linear-gradient(180deg, #eef2f6 0%, #e2e8ee 38%, #c8935a 38%, #b07c46 70%, #9c6b39 100%);
+}
+/* Perspective wooden planks */
+.arena::before{
+  content:""; position:absolute; left:0; right:0; bottom:0; height:62%;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(0,0,0,.06) 0 2px, transparent 2px 6.5%
+    );
+  /* Perspective effect on the planks */
+  transform-origin: 50% 0%;
+  transform: perspective(600px) rotateX(25deg);
+  z-index:0;
+}
+/* Table edge highlight */
+.arena::after{
+  content:""; position:absolute; left:0; right:0; top:38%; height:4px;
+  background: linear-gradient(180deg, #8a5c30, #a97140);
+  box-shadow: 0 3px 8px rgba(0,0,0,.25);
+  z-index:1;
+}
+
+/* ---- Splash canvas ---- */
+#splash{ position:absolute; inset:0; z-index:2; pointer-events:none; display:block; }
+
+/* ---- Header (unified top block) ---- */
+.header{
+  position:absolute; top:10px; left:0; right:0; z-index:10;
+  display:flex; flex-direction:column; align-items:center;
+  text-align:center; pointer-events:none;
+}
+.logo{
+  font-family:"Bungee Shade",cursive; font-size:clamp(1.8rem,4vw,3.2rem);
+  color:#0a0a0a; letter-spacing:2px; line-height:1.1;
+}
+.tagline{
+  font-family:"Space Mono",monospace; font-size:13px; letter-spacing:4px;
+  text-transform:uppercase; color:#00000066; font-weight:700;
+  margin-top:4px; margin-bottom:8px;
+}
+
+/* ---- Tug-of-war bar ---- */
+.war-bar{
+  width:min(85vw, 500px); text-align:center; pointer-events:auto;
+}
+.war-track{
+  height:12px; width:100%; display:flex; overflow:hidden;
+  border:1px solid rgba(0,0,0,.15); box-shadow:0 1px 4px rgba(0,0,0,.12);
+  background:#222; border-radius:6px;
+}
+.war-fill-t{ background:#d97706; transition:width .4s ease; }
+.war-fill-d{ background:#dc2626; transition:width .4s ease; }
+.war-labels{
+  display:flex; justify-content:space-between; margin-top:5px;
+  font-family:"Space Mono",monospace; font-size:14px; font-weight:700;
+  letter-spacing:2px; text-transform:uppercase;
+}
+.war-labels .t-pct{ color:#d97706; font-size:15px; }
+.war-labels .d-pct{ color:#dc2626; font-size:15px; }
+.war-labels .week-tag{ color:#00000055; font-size:12px; letter-spacing:1.5px; }
+.tagline-question{
+  font-family:"Space Mono",monospace; font-size:14px; letter-spacing:2px;
+  text-transform:uppercase; color:#000000bb; font-weight:700; margin-top:8px;
+  text-align:center;
+}
+
+/* ---- Floating live dip bubbles ---- */
+.bubble-layer{
+  position:absolute; inset:0; pointer-events:none; z-index:20; overflow:hidden;
+}
+.dip-bubble{
+  position:absolute;
+  font-family:"Space Mono",monospace; font-size:12px; font-weight:700;
+  color:#1a1a1a; background:rgba(255,255,255,0.94);
+  padding:5px 12px; border-radius:18px;
+  box-shadow:0 4px 14px rgba(0,0,0,0.18);
+  display:flex; align-items:center; gap:6px;
+  pointer-events:none;
+  animation:bubbleFloat 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.dip-bubble.tendie-bubble{ border:1.5px solid #d97706; color:#b45309; }
+.dip-bubble.dimmie-bubble{ border:1.5px solid #dc2626; color:#b91c1c; }
+@keyframes bubbleFloat {
+  0%   { opacity:0; transform:translate(-50%, 8px) scale(0.6); }
+  15%  { opacity:1; transform:translate(-50%, -4px) scale(1.08); }
+  35%  { opacity:1; transform:translate(-50%, -18px) scale(1); }
+  100% { opacity:0; transform:translate(-50%, -75px) scale(0.85); }
+}
+
+/* ---- Live ticker ---- */
+.live-ticker{
+  display:inline-flex; align-items:center; gap:6px;
+  margin-top:6px; padding:3px 12px;
+  background:rgba(255,255,255,0.7); border-radius:14px;
+  font-family:"Space Mono",monospace; font-size:10px; font-weight:700;
+  letter-spacing:1px; text-transform:uppercase; color:#00000099;
+  box-shadow:0 1px 4px rgba(0,0,0,0.06);
+}
+.pulse-dot{
+  width:6px; height:6px; border-radius:50%; background:#22c55e;
+  box-shadow:0 0 8px #22c55e; animation:livePulse 1.5s infinite;
+  flex-shrink:0;
+}
+@keyframes livePulse {
+  0%, 100% { transform:scale(1); opacity:1; }
+  50%      { transform:scale(1.4); opacity:0.4; }
+}
+
+/* ---- Side-by-side stages ---- */
+.stages{
+  position:absolute; inset:0; z-index:3;
+  display:grid; grid-template-columns:1fr 1fr;
+}
+.stage{
+  display:flex; align-items:center; justify-content:center;
+  cursor:pointer; position:relative;
+}
+.stage:hover{ background:rgba(255,255,255,.04); }
+.stage:active{ background:rgba(255,255,255,.08); }
+
+.svg-wrap{
+  position:relative; width:min(72vh, 600px, 46vw); pointer-events:none;
+}
+.svg-wrap svg{ width:100%; height:auto; display:block; overflow:visible; }
+
+/* ---- Pull to refresh indicator ---- */
+.pull-refresh-indicator{
+  position:fixed; top:-60px; left:50%; transform:translateX(-50%);
+  z-index:90; background:rgba(30,18,8,0.92); color:#fff;
+  border:1.5px solid rgba(255,255,255,0.15); border-radius:24px;
+  padding:8px 18px; font-family:"Space Mono",monospace; font-size:11px; font-weight:700;
+  display:flex; align-items:center; gap:8px; pointer-events:none;
+  box-shadow:0 8px 24px rgba(0,0,0,0.4); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  transition:top .2s cubic-bezier(0.2, 0.8, 0.2, 1), transform .15s ease, opacity .2s ease;
+  opacity:0;
+}
+.pull-refresh-indicator.visible{ opacity:1; }
+.pull-arrow{ font-size:14px; display:inline-block; transition:transform .2s ease; }
+.pull-arrow.ready{ transform:rotate(180deg); color:#f59e0b; }
+
+/* ---- Faction labels ---- */
+.faction-label{
+  position:absolute; bottom:84px; left:50%; transform:translateX(-50%);
+  font-family:"Space Mono",monospace; font-size:16px; font-weight:700;
+  letter-spacing:4px; text-transform:uppercase; z-index:4;
+  background:rgba(255,255,255,.85); padding:8px 22px; border-radius:24px;
+  pointer-events:none;
+}
+.tendie-label{ color:#d97706; }
+.dimmie-label{ color:#dc2626; }
+
+/* ---- All-time footer ---- */
+.alltime{
+  position:absolute; bottom:0; left:0; right:0; z-index:10;
+  display:flex; justify-content:center; gap:24px;
+  padding:10px 20px max(12px, env(safe-area-inset-bottom));
+  font-family:"Space Mono",monospace; font-size:12px; font-weight:700;
+  letter-spacing:1.5px; text-transform:uppercase; color:#00000055;
+  background:rgba(255,255,255,.65); backdrop-filter:blur(4px);
+}
+.alltime .num{ color:#0a0a0a; font-size:13px; }
+.alltime .sep{ opacity:.3; }
+.alltime .made-by{ margin-left:auto; font-size:11px; letter-spacing:1.5px; opacity:.45; }
+.alltime .made-by a{ color:inherit; text-decoration:none; }
+.alltime .made-by a:hover{ opacity:1; text-decoration:underline; }
+
+/* ---- Animations ---- */
+@keyframes gloop {
+  0%,100% { transform: translateY(0) scaleY(1) scaleX(1); }
+  50%     { transform: translateY(7px) scaleY(1.22) scaleX(0.92); }
+}
+.glooping{ transform-box:fill-box; transform-origin:top center; animation:gloop 1.5s ease-in-out infinite; }
+@keyframes gingerJiggle {
+  0%   { transform:rotate(0) translateY(0); }
+  18%  { transform:rotate(-7deg) translateY(-2px); }
+  42%  { transform:rotate(6deg) translateY(1px); }
+  68%  { transform:rotate(-3deg); }
+  100% { transform:rotate(0); }
+}
+
+/* ---- Mobile responsive vertical layout ---- */
+@media (max-width: 768px), (orientation: portrait) {
+  .arena {
+    background: linear-gradient(180deg, #eef2f6 0%, #e2e8ee 28%, #c8935a 28%, #b07c46 65%, #9c6b39 100%);
+  }
+  .header {
+    top: 4px;
+  }
+  .logo {
+    font-size: clamp(1.25rem, 5.5vw, 1.75rem);
+    line-height: 1;
+  }
+  .tagline {
+    font-size: 8.5px;
+    letter-spacing: 2px;
+    margin-top: 1px;
+    margin-bottom: 3px;
+  }
+  .war-bar {
+    width: 92vw;
+    max-width: 360px;
+  }
+  .war-track {
+    height: 7px;
+  }
+  .war-labels {
+    font-size: 11px;
+    margin-top: 2px;
+  }
+  .war-labels .week-tag {
+    font-size: 9px;
+  }
+  .tagline-question {
+    font-size: 10.5px;
+    letter-spacing: 1px;
+    margin-top: 3px;
+  }
+  .live-ticker {
+    font-size: 8px;
+    padding: 1px 8px;
+    margin-top: 3px;
+  }
+  .stages {
+    position: absolute;
+    top: 96px;
+    bottom: calc(50px + env(safe-area-inset-bottom, 0px));
+    left: 0;
+    right: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-evenly;
+    align-items: center;
+    padding: 4px 0;
+  }
+  #stageTendie {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 100%;
+  }
+  #stageDimmie {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 100%;
+  }
+  .svg-wrap {
+    width: min(23vh, 185px, 62vw);
+  }
+  .faction-label {
+    position: absolute;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 3px 12px;
+  }
+  #stageTendie .faction-label {
+    bottom: 2px;
+  }
+  #stageDimmie .faction-label {
+    bottom: 2px;
+  }
+  .alltime {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    font-size: 9.5px;
+    letter-spacing: 0.8px;
+    gap: 8px;
+    padding: 10px 14px max(24px, calc(12px + env(safe-area-inset-bottom, 0px)));
+    background: rgba(255,255,255,.94);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 -3px 12px rgba(0,0,0,0.08);
+  }
+  .alltime .top-nations-wrap {
+    display: none;
+  }
+  .alltime .weeks-won-wrap {
+    display: none;
+  }
+  .alltime .reset-wrap {
+    display: none;
+  }
+  .alltime .nations-badge {
+    display: none;
+  }
+  .alltime .made-by {
+    display: inline;
+  }
+}
+
+/* ---- Top-Right Burger Button ---- */
+.burger-btn{
+  position:absolute; top:12px; right:16px; z-index:30;
+  width:38px; height:38px; border-radius:50%;
+  background:rgba(255,255,255,0.85); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  border:1.5px solid rgba(0,0,0,0.12); box-shadow:0 2px 8px rgba(0,0,0,0.1);
+  color:#1e1208; display:flex; align-items:center; justify-content:center;
+  cursor:pointer; transition:background .2s ease, transform .15s ease, box-shadow .2s ease;
+}
+.burger-btn:hover{
+  background:#fff; transform:scale(1.06); box-shadow:0 4px 14px rgba(0,0,0,0.16);
+}
+.burger-btn:active{
+  transform:scale(0.95);
+}
+@media (max-width: 768px), (orientation: portrait){
+  .burger-btn{
+    top:8px; right:10px; width:34px; height:34px;
+  }
+}
+
+/* ---- Nations Leaderboard & Menu Modals ---- */
+.nations-clickable{
+  cursor:pointer; padding:2px 8px; border-radius:12px;
+  background:rgba(0,0,0,0.06); transition:background .2s ease, transform .1s ease;
+  display:inline-flex; align-items:center; gap:6px;
+}
+.nations-clickable:hover{
+  background:rgba(0,0,0,0.12); transform:translateY(-1px);
+}
+.nations-badge{
+  font-size:9px; background:#d97706; color:#fff;
+  padding:2px 6px; border-radius:8px; letter-spacing:0.5px;
+}
+
+.modal-backdrop{
+  position:fixed; inset:0; z-index:100;
+  background:rgba(0,0,0,0.68); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  display:flex; align-items:center; justify-content:center;
+  padding:16px; opacity:0; pointer-events:none;
+  transition:opacity .22s ease;
+}
+.modal-backdrop.open{
+  opacity:1; pointer-events:auto;
+}
+.modal-card{
+  width:100%; max-width:480px; max-height:85vh;
+  background:linear-gradient(160deg, #2b1a0d 0%, #1c1108 100%);
+  border:1.5px solid rgba(255,255,255,0.15);
+  border-radius:20px; box-shadow:0 24px 60px rgba(0,0,0,0.7);
+  display:flex; flex-direction:column; overflow:hidden;
+  transform:scale(0.92) translateY(12px);
+  transition:transform .25s cubic-bezier(0.2, 0.8, 0.2, 1);
+  color:#fff; font-family:"Space Mono",monospace;
+}
+.modal-backdrop.open .modal-card{
+  transform:scale(1) translateY(0);
+}
+.modal-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:16px 20px 12px; border-bottom:1px solid rgba(255,255,255,0.08);
+}
+.modal-title{
+  font-size:13.5px; font-weight:700; letter-spacing:2px; color:#fff;
+  display:flex; align-items:center; gap:8px;
+}
+.modal-close{
+  background:rgba(255,255,255,0.12); border:none; color:#fff;
+  width:30px; height:30px; border-radius:50%;
+  font-size:14px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  transition:background .2s ease;
+}
+.modal-close:hover{ background:rgba(255,255,255,0.25); }
+.modal-list{
+  padding:12px 18px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px;
+  max-height:55vh;
+}
+.nation-row{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:9px 14px; border-radius:10px;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);
+  transition:background .15s ease;
+}
+.nation-row:hover{ background:rgba(255,255,255,0.08); }
+.nation-left{ display:flex; align-items:center; gap:10px; }
+.nation-rank{ font-size:12px; font-weight:700; width:24px; color:#ffffff77; }
+.nation-rank.rank-1{ color:#f59e0b; font-size:15px; }
+.nation-rank.rank-2{ color:#cbd5e1; font-size:15px; }
+.nation-rank.rank-3{ color:#d97706; font-size:15px; }
+.nation-flag{ font-size:22px; line-height:1; }
+.nation-name{ font-size:12.5px; font-weight:700; letter-spacing:1px; color:#fff; }
+.nation-right{ display:flex; flex-direction:column; align-items:flex-end; gap:3px; }
+.nation-dips{ font-size:12.5px; font-weight:700; color:#f59e0b; }
+.nation-pct-bar{
+  width:72px; height:4px; border-radius:2px; background:rgba(255,255,255,0.1); overflow:hidden;
+}
+.nation-pct-fill{ height:100%; background:#f59e0b; }
+.modal-footer{
+  padding:12px 20px; border-top:1px solid rgba(255,255,255,0.08);
+  font-size:11px; color:rgba(255,255,255,0.55); text-align:center; letter-spacing:1px;
+}
+
+/* ---- Menu Modal Body ---- */
+.menu-body{
+  padding:18px 20px; display:flex; flex-direction:column; gap:14px; overflow-y:auto;
+}
+.menu-stat-card{
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08);
+  border-radius:12px; padding:14px 16px; text-align:center;
+}
+.stat-card-title{
+  font-size:11px; letter-spacing:1.5px; color:rgba(255,255,255,0.6); font-weight:700;
+  margin-bottom:6px;
+}
+.stat-card-value{
+  font-size:20px; font-weight:700; color:#f59e0b; letter-spacing:2px;
+}
+.stat-card-sub{
+  font-size:10px; color:rgba(255,255,255,0.4); margin-top:4px;
+}
+.stat-score-row{
+  display:flex; justify-content:center; align-items:center; gap:12px;
+  font-size:14px; font-weight:700; margin-top:4px;
+}
+.tendie-score{ color:#d97706; }
+.dimmie-score{ color:#dc2626; }
+.menu-action-btn{
+  background:linear-gradient(90deg, #d97706, #b45309); border:none; border-radius:12px;
+  color:#fff; padding:12px 18px; font-family:"Space Mono",monospace; font-size:12px; font-weight:700;
+  letter-spacing:1px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;
+  box-shadow:0 4px 14px rgba(217,119,6,0.3); transition:transform .15s ease, box-shadow .15s ease;
+}
+.menu-action-btn:hover{
+  transform:translateY(-1px); box-shadow:0 6px 18px rgba(217,119,6,0.45);
+}
+.menu-action-btn:active{ transform:scale(0.98); }
+.share-btn{
+  background:linear-gradient(90deg, #2563eb, #1d4ed8);
+  box-shadow:0 4px 14px rgba(37,99,235,0.3);
+}
+.share-btn:hover{
+  box-shadow:0 6px 18px rgba(37,99,235,0.45);
+}
+
+/* ---- User Dossier & Retention ---- */
+.user-dossier-card{
+  background:linear-gradient(145deg, rgba(217,119,6,0.12), rgba(220,38,38,0.08));
+  border:1px solid rgba(245,158,11,0.3);
+}
+.user-rank-badge{
+  font-size:15px; font-weight:700; color:#fef08a; letter-spacing:1px; margin:4px 0 6px;
+}
+.user-dips-breakdown{
+  font-size:12px; color:rgba(255,255,255,0.85); display:flex; justify-content:center; gap:8px; align-items:center;
+}
+.user-sub-dips{
+  font-size:10.5px; color:rgba(255,255,255,0.5); margin-top:6px;
+}
+
+.toast-msg{
+  position:fixed; top:20px; left:50%; transform:translateX(-50%) translateY(-30px);
+  background:rgba(20,12,6,0.95); color:#fef08a; border:1px solid #f59e0b;
+  padding:10px 22px; border-radius:30px; font-family:"Space Mono",monospace;
+  font-size:12px; font-weight:700; letter-spacing:1px; z-index:200;
+  box-shadow:0 8px 24px rgba(0,0,0,0.6); opacity:0; pointer-events:none;
+  transition:transform .25s cubic-bezier(0.2,0.8,0.2,1), opacity .25s ease;
+}
+.toast-msg.show{
+  transform:translateX(-50%) translateY(0); opacity:1;
+}
+
+.menu-lore{
+  background:rgba(0,0,0,0.25); border-radius:10px; padding:12px 14px;
+  font-size:10.5px; line-height:1.6; color:rgba(255,255,255,0.7);
+}
+.lore-title{
+  font-size:10.5px; font-weight:700; color:#f59e0b; margin-bottom:4px; letter-spacing:1px;
+}
+</style>
+</head>
+<body>
+<div class="arena">
+  <canvas id="splash"></canvas>
+  <div class="bubble-layer" id="bubbleLayer"></div>
+
+  <!-- Pull to Refresh Indicator -->
+  <div class="pull-refresh-indicator" id="pullRefreshIndicator">
+    <span class="pull-arrow" id="pullArrow">↓</span>
+    <span id="pullText">Pull to refresh</span>
+  </div>
+
+  <!-- Top-Right Line Art Burger Menu Button -->
+  <button class="burger-btn" id="menuBtn" aria-label="Open Snack War Menu" title="Stats, Countdown & Lore">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 10h16C20 5 17 4 12 4S4 5 4 10Z"/>
+      <path d="M4 14h16"/>
+      <path d="M4 18h16a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"/>
+    </svg>
+  </button>
+
+  <div class="header">
+    <div class="logo">DIP-LOMACY</div>
+    <div class="tagline">The Global Snack War</div>
+    <!-- Tug-of-war bar -->
+    <div class="war-bar">
+      <div class="war-track">
+        <div class="war-fill-t" id="warT" style="width:50%"></div>
+        <div class="war-fill-d" id="warD" style="width:50%"></div>
+      </div>
+      <div class="war-labels">
+        <span class="t-pct" id="tPct">50%</span>
+        <span class="week-tag" id="weekTag">WEEK 35 · 2026</span>
+        <span class="d-pct" id="dPct">50%</span>
+      </div>
+      <div class="tagline-question">Who will get good boy points?</div>
+      <div class="live-ticker" id="liveTicker">
+        <span class="pulse-dot"></span>
+        <span id="tickerText">⚡ GLOBAL SNACK WAR LIVE</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- All-time footer -->
+  <div class="alltime">
+    <span>All-Time: Tendie <span class="num" id="atTendie">—</span></span>
+    <span class="sep">|</span>
+    <span>Dimmie <span class="num" id="atDimmie">—</span></span>
+    <span class="sep">|</span>
+    <span class="top-nations-wrap nations-clickable" id="openNationsModal" title="Click to view all nations leaderboard">
+      Top: <span class="num" id="topNations">—</span> <span class="nations-badge">LEADERBOARD 📊</span>
+    </span>
+    <span class="sep">|</span>
+    <span class="weeks-won-wrap">Weeks Won: <span class="num" id="wwTendie">0</span> – <span class="num" id="wwDimmie">0</span></span>
+    <span class="sep">|</span>
+    <span class="reset-wrap">Resets in: <span class="num" id="resetCountdown">—</span></span>
+    <span class="made-by">made by <a href="https://ephix.net" target="_blank" rel="noopener">ephix pulse</a></span>
+  </div>
+
+  <!-- Nations Modal Popup -->
+  <div class="modal-backdrop" id="nationsModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>🌍</span>
+          <span>GLOBAL DIPPING NATIONS</span>
+        </div>
+        <button class="modal-close" id="closeNationsModal" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-list" id="nationsList">
+        <!-- Dynamically rendered rows -->
+      </div>
+      <div class="modal-footer">
+        Active Nations: <span class="num" id="modalNationCount">0</span> · Total Dips: <span class="num" id="modalTotalDips">0</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Menu / Info Modal Popup -->
+  <div class="modal-backdrop" id="menuModal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title">
+          <span>📊</span>
+          <span>SNACK WAR HQ</span>
+        </div>
+        <button class="modal-close" id="closeMenuBtn" aria-label="Close">✕</button>
+      </div>
+      <div class="menu-body">
+        <!-- User Dossier & Retention Card -->
+        <div class="menu-stat-card user-dossier-card">
+          <div class="stat-card-title">🪪 YOUR DIP-LOMAT DOSSIER</div>
+          <div class="user-rank-badge" id="userRankBadge">🥣 Sauce Cadet</div>
+          <div class="user-dips-breakdown">
+            <span>🔥 <strong id="userStreakCount">1</strong> Day Streak</span>
+            <span class="sep">·</span>
+            <span>Total: <strong id="userTotalDips">0</strong> Dips</span>
+          </div>
+          <div class="user-sub-dips">
+            🍗 Tendie: <span id="userTendieDips">0</span> · 🥟 Dimmie: <span id="userDimmieDips">0</span>
+          </div>
+        </div>
+
+        <button class="menu-action-btn share-btn" id="shareDipsBtn">
+          <span id="shareBtnText">📤 Share My Contribution</span>
+          <span>→</span>
+        </button>
+
+        <div class="menu-stat-card">
+          <div class="stat-card-title">⏳ WEEKLY RESET COUNTDOWN</div>
+          <div class="stat-card-value" id="modalResetCountdown">—</div>
+          <div class="stat-card-sub">Next reset: Monday 00:00 UTC</div>
+        </div>
+
+        <div class="menu-stat-card">
+          <div class="stat-card-title">🏆 WEEKS WON SCOREBOARD</div>
+          <div class="stat-score-row">
+            <span class="score-side tendie-score">TENDIE: <span class="num" id="menuWwTendie">0</span></span>
+            <span class="sep">·</span>
+            <span class="score-side dimmie-score">DIMMIE: <span class="num" id="menuWwDimmie">0</span></span>
+          </div>
+        </div>
+
+        <button class="menu-action-btn" id="menuNationsBtn">
+          <span>🌍 View Nations Leaderboard</span>
+          <span>→</span>
+        </button>
+
+        <div class="menu-lore">
+          <div class="lore-title">⚔️ THE ETERNAL BATTLE</div>
+          <div class="lore-text">
+            <strong>Tendie</strong>: Golden fried crunch plunging headfirst into ranch.<br>
+            <strong>Dimmie</strong>: Authentic Shanghainese Xiao Long Bao delicately dipped in Zhenjiang red vinegar & julienned ginger.
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        made by <a href="https://ephix.net" target="_blank" rel="noopener" style="color:#f59e0b; text-decoration:none;">ephix pulse</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Milestone / Share Toast -->
+  <div class="toast-msg" id="toastMsg">✓ Copied to clipboard!</div>
+
+  <div class="stages">
+    <div class="stage" id="stageTendie">
+      <div class="svg-wrap" id="wrapTendie"></div>
+      <div class="faction-label tendie-label">TENDIE</div>
+    </div>
+    <div class="stage" id="stageDimmie">
+      <div class="svg-wrap" id="wrapDimmie"></div>
+      <div class="faction-label dimmie-label">DIMMIE</div>
+    </div>
+  </div>
+</div>
+
+<template id="tpl-tendie">{{TENDIE_SVG}}</template>
+<template id="tpl-dimmie">{{DIMMIE_SVG}}</template>
+
+<script>
+// ---- Config (baked presets) ----
+const PRESETS = {
+  tendie: { pivot:[-1200,1338], angle:8, anticipation:4, overshoot:6, secondSpin:16,
+    antMs:162, downMs:60, holdMs:232, upMs:224,
+    wave:{line:44, amp:47, rise:70}, drool:{pos:[-8,-32], scale:[0.338,0.45]},
+    splash:{drops:40, power:240, fadeS:10} },
+  dimmie: { pivot:[1922,788], angle:-21, anticipation:3, overshoot:6, secondSpin:11,
+    antMs:260, downMs:480, holdMs:171, upMs:321,
+    wave:{line:75, amp:22, rise:70},
+    splash:{drops:12, power:68, fadeS:7} },
+};
+const BOWL_ID = { tendie:'bowl', dimmie:'Vinegar_Bowl' };
+const SPIN = { tendie:['tendie'], dimmie:['Chop_Stick_Front','Chop_Stick_Back'] };
+const SPIN_ORIGIN = { tendie:'center top', dimmie:'center' };
+const SAUCE = {
+  tendie: { drop:'#fffdf2', stain:'rgba(226,214,180,ALPHA)' },
+  dimmie: { drop:'#3c2718', stain:'rgba(40,22,14,ALPHA)' },
+};
+
+// Face expression IDs
+const FACES = {
+  tendie: ['Face_Happy','Face_Stunned','Face_Angry','Face_Surprised','Face_Begging','Face_Worried'],
+  dimmie: ['XLB_Face_Happy','XLB_Face_Begging','XLB_Face_Worried','XLB_Face_Angry','XLB_Face_Stunned','XLB_Face_Surprised'],
+};
+// All non-happy faces are fair game for dip/react expressions
+const EXPR_FACES = {
+  tendie: ['Face_Stunned','Face_Angry','Face_Surprised','Face_Begging','Face_Worried'],
+  dimmie: ['XLB_Face_Stunned','XLB_Face_Angry','XLB_Face_Surprised','XLB_Face_Begging','XLB_Face_Worried'],
+};
+const FACE_FADE_MS = 120;
+
+const NS = 'http://www.w3.org/2000/svg';
+const easeInCubic = t => t*t*t;
+const easeOutCubic = t => 1-Math.pow(1-t,3);
+const easeOutBack = (t,k) => { const c1=1.70158*k, c3=c1+1; return 1+c3*Math.pow(t-1,3)+c1*Math.pow(t-1,2); };
+
+function wrapChildren(grp){
+  const inner = document.createElementNS(NS,'g');
+  while(grp.firstChild) inner.appendChild(grp.firstChild);
+  grp.appendChild(inner);
+  return inner;
+}
+
+// ---- Rig per side ----
+const rigs = {};
+
+function setupRig(side){
+  const wrap = document.getElementById(side === 'tendie' ? 'wrapTendie' : 'wrapDimmie');
+  wrap.innerHTML = document.getElementById('tpl-'+side).innerHTML;
+  const svg = wrap.querySelector('svg');
+  svg.style.overflow = 'visible';
+  const P = PRESETS[side];
+  const bowlId = BOWL_ID[side];
+
+  const rig = { svg, side, rotors:[], spinners:[], gingers:[], drool:null, droolBase:[0,0],
+    clipPath:null, geom:null, wave:{...P.wave}, waveLift:0, dipToken:0,
+    faces:new Map(), activeFace:FACES[side][0], bowlRect:null };
+
+  // Faces: set all to opacity-based visibility for crossfade
+  FACES[side].forEach(id => {
+    const el = svg.getElementById(id);
+    if(!el) return;
+    rig.faces.set(id, el);
+    el.style.transition = `opacity ${FACE_FADE_MS}ms ease`;
+    el.removeAttribute('class');
+    el.style.display = '';
+    el.style.opacity = id === rig.activeFace ? '1' : '0';
+  });
+
+  // Sauce clip
+  const bowl = svg.querySelector('#'+bowlId);
+  if(bowl){
+    const b = bowl.getBBox();
+    rig.geom = { x:b.x-b.width, w:b.width*3, baseY:b.y+b.height*0.3 };
+    let defs = svg.querySelector('defs');
+    if(!defs){ defs=document.createElementNS(NS,'defs'); svg.insertBefore(defs,svg.firstChild); }
+    const clip = document.createElementNS(NS,'clipPath');
+    clip.id = 'sauceClip-'+side;
+    clip.setAttribute('clipPathUnits','userSpaceOnUse');
+    const p = document.createElementNS(NS,'path');
+    clip.appendChild(p); defs.appendChild(clip);
+    rig.clipPath = p;
+  }
+
+  // Wrap dipping groups
+  const NO_CLIP = [bowlId, 'Hand', 'Thumb'];
+  const targets = Array.from(svg.querySelectorAll(':scope > g')).filter(g => !NO_CLIP.includes(g.id));
+  targets.forEach(t => {
+    const inner = wrapChildren(t);
+    inner.style.transformBox = 'view-box';
+    inner.style.willChange = 'transform';
+    rig.rotors.push(inner);
+    if(rig.clipPath) t.setAttribute('clip-path', `url(#sauceClip-${side})`);
+  });
+  // Hand/Thumb still need to rotate with the dip but shouldn't be sauce-clipped.
+  ['Hand','Thumb'].forEach(id => {
+    const g = svg.querySelector('#'+id);
+    if(!g) return;
+    const inner = wrapChildren(g);
+    inner.style.transformBox = 'view-box';
+    inner.style.willChange = 'transform';
+    rig.rotors.push(inner);
+  });
+
+  // Secondary spin
+  SPIN[side].forEach(id => {
+    const outer = svg.querySelector('#'+id);
+    if(!outer||!outer.firstElementChild) return;
+    const inner = wrapChildren(outer.firstElementChild);
+    inner.style.transformBox = 'fill-box';
+    inner.style.transformOrigin = SPIN_ORIGIN[side];
+    rig.spinners.push(inner);
+  });
+
+  // Drip gloop
+  const drip = svg.querySelector('#Drip');
+  if(drip) wrapChildren(drip).classList.add('glooping');
+
+  // Ginger shimmy
+  if(side==='dimmie'){
+    rig.gingers = Array.from(svg.querySelectorAll('[id^="Ginger"]'));
+    rig.gingers.forEach(g => { g.style.transformBox='fill-box'; g.style.transformOrigin='center'; });
+  }
+
+  // Measure bowl for splash
+  if(bowl){
+    const r = bowl.getBoundingClientRect();
+    const s = document.querySelector('.arena').getBoundingClientRect();
+    rig.bowlRect = { x:r.left-s.left+r.width/2, y:r.top-s.top+r.height*0.3, w:r.width };
+  }
+
+  rigs[side] = rig;
+  updateWave(rig);
+  return rig;
+}
+
+// Tendie drool (clone from Dimmie's template)
+function addTendieDrool(){
+  const rig = rigs.tendie;
+  if(!rig) return;
+  const P = PRESETS.tendie.drool;
+  const src = document.getElementById('tpl-dimmie').content.querySelector('#Drip');
+  const tongue = rig.svg.querySelector('#tongue');
+  if(!src||!tongue||!P) return;
+  const drip = src.cloneNode(true);
+  drip.removeAttribute('id');
+  drip.querySelectorAll('*').forEach(el => { el.setAttribute('fill','#fdf6df'); el.setAttribute('stroke','none'); el.removeAttribute('class'); });
+  const gloop = document.createElementNS(NS,'g'); gloop.classList.add('glooping'); gloop.appendChild(drip);
+  const pos = document.createElementNS(NS,'g'); pos.appendChild(gloop);
+  tongue.parentNode.insertBefore(pos, tongue);
+  rig.drool = pos;
+  const db = drip.getBBox();
+  drip.setAttribute('transform', `translate(${-(db.x+db.width/2)}, ${-db.y})`);
+  const tb = tongue.getBBox();
+  rig.droolBase = [tb.x+tb.width/2, tb.y];
+  const x = rig.droolBase[0]+P.pos[0], y = rig.droolBase[1]+P.pos[1];
+  pos.setAttribute('transform', `translate(${x},${y}) scale(${P.scale[0]},${P.scale[1]})`);
+}
+
+// Face crossfade
+function setFace(rig, faceId){
+  const prev = rig.activeFace;
+  if(prev===faceId) return prev;
+  const oldEl = rig.faces.get(prev);
+  const newEl = rig.faces.get(faceId);
+  if(oldEl) oldEl.style.opacity = '0';
+  if(newEl) newEl.style.opacity = '1';
+  rig.activeFace = faceId;
+  return prev;
+}
+
+// Wave update
+function updateWave(rig){
+  if(!rig.clipPath||!rig.geom) return;
+  const g = rig.geom;
+  const top = g.baseY-4000;
+  const y = g.baseY + rig.wave.line - rig.waveLift;
+  const amp = rig.wave.amp;
+  const ph = performance.now()/280;
+  const n=6, step=g.w/n;
+  let d = `M ${g.x} ${top} L ${g.x+g.w} ${top} L ${g.x+g.w} ${y}`;
+  for(let i=n;i>0;i--){
+    const x1=g.x+(i-1)*step, cx=g.x+(i-0.5)*step;
+    d += ` Q ${cx} ${y+Math.sin(ph+i)*amp}, ${x1} ${y}`;
+  }
+  d += ' Z';
+  rig.clipPath.setAttribute('d', d);
+}
+
+// ---- Splash system ----
+const canvas = document.getElementById('splash');
+const ctx = canvas.getContext('2d');
+let drops = [], stains = [], persistentStains = [];
+
+function resizeCanvas(){
+  const a = document.querySelector('.arena');
+  canvas.width = a.clientWidth; canvas.height = a.clientHeight;
+}
+
+function splash(side){
+  const rig = rigs[side];
+  if(!rig||!rig.bowlRect) return;
+  const P = PRESETS[side].splash;
+  const sauce = SAUCE[side];
+  const tableY = rig.bowlRect.y + rig.bowlRect.w * 0.12;
+  for(let i=0;i<P.drops;i++){
+    const ang = -Math.PI/2 + (Math.random()-.5)*Math.PI*1.15;
+    const speed = P.power*0.06*(0.5+Math.random());
+    drops.push({
+      x:rig.bowlRect.x+(Math.random()-.5)*rig.bowlRect.w*0.4,
+      y:rig.bowlRect.y,
+      vx:Math.cos(ang)*speed, vy:Math.sin(ang)*speed,
+      r:3+Math.random()*5, color:sauce.drop,
+      tableY:tableY+Math.random()*40, side
+    });
+  }
+}
+
+// ---- Audio blop ----
+let ac;
+function blop(deep, isRemote = false){
+  try{
+    ac = ac || new (window.AudioContext||window.webkitAudioContext)();
+    const o=ac.createOscillator(), g=ac.createGain();
+    o.type='sine';
+    o.frequency.setValueAtTime(deep?360:520, ac.currentTime);
+    o.frequency.exponentialRampToValueAtTime(100, ac.currentTime+0.11);
+    const maxVol = isRemote ? 0.15 : 0.45;
+    g.gain.setValueAtTime(0.0001, ac.currentTime);
+    g.gain.exponentialRampToValueAtTime(maxVol, ac.currentTime+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime+0.17);
+    o.connect(g).connect(ac.destination); o.start(); o.stop(ac.currentTime+0.19);
+  }catch(e){}
+}
+
+// ---- Country Flag & Floating Bubble Helpers ----
+function countryFlag(code) {
+  if (!code || code === 'XX' || code.length !== 2) return '🌍';
+  const c = code.toUpperCase();
+  return String.fromCodePoint(127397 + c.charCodeAt(0)) + String.fromCodePoint(127397 + c.charCodeAt(1));
+}
+
+function spawnDipBubble(side, country, city, isLocal = false) {
+  const rig = rigs[side];
+  if (!rig || !rig.bowlRect) return;
+  const flag = countryFlag(country);
+  const el = document.createElement('div');
+  el.className = `dip-bubble ${side}-bubble`;
+  const locationText = isLocal ? 'YOU +1' : (city ? `${city} +1` : `${country} +1`);
+  el.innerHTML = `<span>${flag}</span><span>${locationText}</span>`;
+  
+  // Position over the center of the dipping bowl
+  el.style.left = rig.bowlRect.x + 'px';
+  el.style.top = (rig.bowlRect.y - 14) + 'px';
+  document.getElementById('bubbleLayer').appendChild(el);
+  setTimeout(() => el.remove(), 1850);
+}
+
+// Live Ticker updates
+let tickerQueue = [];
+function addTickerDip(side, country, city) {
+  const flag = countryFlag(country);
+  const name = side === 'tendie' ? 'Tendie' : 'Dimmie';
+  const loc = city ? `${city} (${flag})` : flag;
+  const entry = `${loc} dipped ${name}`;
+  tickerQueue.unshift(entry);
+  if (tickerQueue.length > 5) tickerQueue.pop();
+  document.getElementById('tickerText').textContent = '⚡ LATEST: ' + tickerQueue.slice(0, 3).join(' · ');
+}
+
+// ---- Dip trigger ----
+function triggerDip(side, isRemote = false){
+  const rig = rigs[side];
+  if(!rig) return;
+  const P = PRESETS[side];
+  const [pivotX,pivotY] = P.pivot;
+  const A = P.angle;
+  rig.dipToken++;
+  const token = rig.dipToken;
+  const t0 = performance.now();
+  let faceChanged = false;
+  let splashed = false;
+
+  const other = side==='tendie'?'dimmie':'tendie';
+  const otherRig = rigs[other];
+
+  const setAngle = a => {
+    const tf = `rotate(${a}deg)`;
+    rig.rotors.forEach(r => { r.style.transformOrigin=`${pivotX}px ${pivotY}px`; r.style.transform=tf; });
+  };
+  const spin = deg => rig.spinners.forEach(s => s.style.transform=`rotate(${deg}deg)`);
+
+  rig.gingers.forEach(g => g.classList.remove('ginger-jiggle'));
+  requestAnimationFrame(() => rig.gingers.forEach(g => g.classList.add('ginger-jiggle')));
+
+  const frame = now => {
+    if(rig.dipToken!==token) return;
+    const t = now-t0;
+    let a;
+    if(t < P.antMs){
+      a = -P.anticipation * easeOutCubic(t/P.antMs);
+    } else if(t < P.antMs+P.downMs){
+      const p = (t-P.antMs)/P.downMs;
+      a = -P.anticipation + (A+P.anticipation)*easeInCubic(p);
+      if(!faceChanged){
+        faceChanged = true;
+        const pick = a => a[Math.floor(Math.random()*a.length)];
+        setFace(rig, pick(EXPR_FACES[side]));
+        // opponent always goes angry
+        const angryFace = other==='tendie' ? 'Face_Angry' : 'XLB_Face_Angry';
+        if(otherRig) setFace(otherRig, angryFace);
+      }
+    } else if(t < P.antMs+P.downMs+P.holdMs){
+      a = A;
+      if(!splashed){ splashed=true; splash(side); blop(side==='dimmie', isRemote); }
+    } else {
+      const p = Math.min(1,(t-P.antMs-P.downMs-P.holdMs)/P.upMs);
+      a = A*(1-easeOutBack(p, 0.4+P.overshoot/8));
+      if(p>=1){
+        setAngle(0); spin(0); rig.waveLift=0;
+        setFace(rig, FACES[side][0]);
+        if(otherRig) setFace(otherRig, FACES[other][0]);
+        return;
+      }
+    }
+    setAngle(a);
+    spin(A ? P.secondSpin*(a/A) : 0);
+    rig.waveLift = rig.geom ? P.wave.rise*(A ? a/A : 0) : 0;
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+}
+
+// Remote dip trigger (rate-limited so animation remains buttery smooth)
+let lastRemoteDip = { tendie: 0, dimmie: 0 };
+function triggerRemoteDip(side, country, city) {
+  spawnDipBubble(side, country, city, false);
+  addTickerDip(side, country, city);
+
+  const now = performance.now();
+  if (now - lastRemoteDip[side] > 320) {
+    lastRemoteDip[side] = now;
+    triggerDip(side, true);
+  } else {
+    splash(side);
+    blop(side==='dimmie', true);
+  }
+}
+
+// ---- Render loop ----
+function tick(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const now = performance.now();
+  if(rigs.tendie) updateWave(rigs.tendie);
+  if(rigs.dimmie) updateWave(rigs.dimmie);
+
+  // 1. Persistent dried sauce stains (battle scars)
+  for(let i=0; i<persistentStains.length; i++){
+    const ps = persistentStains[i];
+    ctx.save(); ctx.translate(ps.x, ps.y); ctx.scale(1, 0.4);
+    const g = ctx.createRadialGradient(0,0,0,0,0,ps.r);
+    g.addColorStop(0, ps.color.replace('ALPHA', ps.peak.toFixed(3)));
+    g.addColorStop(0.7, ps.color.replace('ALPHA', (ps.peak * 0.5).toFixed(3)));
+    g.addColorStop(1, ps.color.replace('ALPHA', '0'));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,ps.r,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // 2. Active splashing stains
+  for(let i=stains.length-1;i>=0;i--){
+    const s = stains[i];
+    const fadeMs = PRESETS[s.side].splash.fadeS*1000;
+    const life = (now-s.born)/fadeMs;
+    if(life>=1){ stains.splice(i,1); continue; }
+    const peak = (1-life)*0.6;
+    ctx.save(); ctx.translate(s.x,s.y); ctx.scale(1,0.4);
+    const g = ctx.createRadialGradient(0,0,0,0,0,s.r);
+    g.addColorStop(0, s.color.replace('ALPHA',peak.toFixed(3)));
+    g.addColorStop(0.6, s.color.replace('ALPHA',(peak*0.75).toFixed(3)));
+    g.addColorStop(1, s.color.replace('ALPHA','0'));
+    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,s.r,0,Math.PI*2); ctx.fill();
+    ctx.restore();
+  }
+
+  // 3. Falling drops
+  for(let i=drops.length-1;i>=0;i--){
+    const d = drops[i];
+    d.vy+=0.35; d.x+=d.vx; d.y+=d.vy;
+    if(d.y>=d.tableY){
+      stains.push({x:d.x,y:d.tableY,r:d.r*1.6+Math.random()*4,born:now,color:SAUCE[d.side].stain,side:d.side});
+      
+      // Chance to leave a permanent dried battle scar on the table
+      if(Math.random() < 0.22){
+        if(persistentStains.length >= 50) persistentStains.shift();
+        persistentStains.push({
+          x: d.x, y: d.tableY,
+          r: d.r * 1.5 + Math.random() * 3,
+          peak: 0.22 + Math.random() * 0.16,
+          color: SAUCE[d.side].stain,
+          side: d.side
+        });
+      }
+      drops.splice(i,1); continue;
+    }
+    ctx.fillStyle = d.color;
+    ctx.beginPath(); ctx.arc(d.x,d.y,d.r,0,Math.PI*2); ctx.fill();
+  }
+  requestAnimationFrame(tick);
+}
+
+// ---- Pull to refresh touch gesture ----
+let touchStartY = 0, touchStartX = 0, isPulling = false;
+const pullIndicator = document.getElementById('pullRefreshIndicator');
+const pullArrow = document.getElementById('pullArrow');
+const pullText = document.getElementById('pullText');
+
+window.addEventListener('touchstart', e => {
+  if (e.touches.length !== 1) return;
+  const t = e.touches[0];
+  if (t.clientY < window.innerHeight * 0.35) {
+    touchStartY = t.clientY;
+    touchStartX = t.clientX;
+    isPulling = true;
+  } else {
+    isPulling = false;
+  }
+}, { passive: true });
+
+window.addEventListener('touchmove', e => {
+  if (!isPulling || e.touches.length !== 1) return;
+  const t = e.touches[0];
+  const deltaY = t.clientY - touchStartY;
+  const deltaX = Math.abs(t.clientX - touchStartX);
+
+  if (deltaY > 15 && deltaY > deltaX) {
+    pullIndicator.classList.add('visible');
+    const pullDist = Math.min(85, deltaY * 0.45);
+    pullIndicator.style.top = `${pullDist}px`;
+    if (deltaY > 90) {
+      pullArrow.classList.add('ready');
+      pullText.textContent = 'Release to refresh';
+    } else {
+      pullArrow.classList.remove('ready');
+      pullText.textContent = 'Pull to refresh';
+    }
+  }
+}, { passive: true });
+
+window.addEventListener('touchend', e => {
+  if (!isPulling) return;
+  isPulling = false;
+  if (pullArrow.classList.contains('ready')) {
+    pullText.textContent = 'Refreshing...';
+    setTimeout(() => location.reload(), 250);
+  } else {
+    pullIndicator.style.top = '-60px';
+    pullIndicator.classList.remove('visible');
+    pullArrow.classList.remove('ready');
+  }
+}, { passive: true });
+
+// ---- Init ----
+resizeCanvas();
+window.addEventListener('resize', () => {
+  resizeCanvas();
+  // Re-measure bowls
+  ['tendie','dimmie'].forEach(s => {
+    const rig = rigs[s];
+    if(!rig) return;
+    const bowl = rig.svg.querySelector('#'+BOWL_ID[s]);
+    if(!bowl) return;
+    const r = bowl.getBoundingClientRect();
+    const ar = document.querySelector('.arena').getBoundingClientRect();
+    rig.bowlRect = {x:r.left-ar.left+r.width/2, y:r.top-ar.top+r.height*0.3, w:r.width};
+  });
+});
+
+setupRig('tendie');
+addTendieDrool();
+setupRig('dimmie');
+tick();
+
+function handleUserDip(side){
+  spawnDipBubble(side, '', '', true);
+  triggerDip(side, false);
+  recordUserDip(side);
+  wsSend(side);
+}
+
+document.getElementById('stageTendie').addEventListener('click', () => handleUserDip('tendie'));
+document.getElementById('stageDimmie').addEventListener('click', () => handleUserDip('dimmie'));
+document.addEventListener('keydown', e => {
+  if(e.code==='KeyA'||e.code==='ArrowLeft'){ handleUserDip('tendie'); }
+  if(e.code==='KeyD'||e.code==='ArrowRight'){ handleUserDip('dimmie'); }
+});
+
+// ---- WebSocket global score ----
+function fmtNum(n){ return n.toLocaleString(); }
+function getWeekLabel(ts = Date.now()){
+  const d = new Date(ts);
+  const date = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const dayNum = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  const weekNo = Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `WEEK ${weekNo} · ${date.getUTCFullYear()}`;
+}
+
+// Country names helper
+let regionNames;
+try { regionNames = new Intl.DisplayNames(['en'], { type: 'region' }); } catch(e){}
+function getCountryName(code) {
+  if (!code || code === 'XX') return 'Worldwide';
+  try { return (regionNames && regionNames.of(code.toUpperCase())) || code; } catch(e){ return code; }
+}
+
+let latestTopCountries = [];
+function renderNationsModal() {
+  const list = document.getElementById('nationsList');
+  list.innerHTML = '';
+  if (!latestTopCountries || latestTopCountries.length === 0) {
+    list.innerHTML = '<div style="text-align:center; padding:32px 10px; color:rgba(255,255,255,0.4);">No country dips recorded yet. Be the first to dip!</div>';
+    document.getElementById('modalNationCount').textContent = '0';
+    document.getElementById('modalTotalDips').textContent = '0';
+    return;
+  }
+
+  const totalDips = latestTopCountries.reduce((sum, c) => sum + c.dips, 0);
+  const maxDips = latestTopCountries[0]?.dips || 1;
+
+  document.getElementById('modalNationCount').textContent = latestTopCountries.length;
+  document.getElementById('modalTotalDips').textContent = fmtNum(totalDips);
+
+  latestTopCountries.forEach((c, idx) => {
+    const rank = idx + 1;
+    const rankBadge = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : (rank === 3 ? '🥉' : `#${rank}`));
+    const rankClass = rank <= 3 ? `rank-${rank}` : '';
+    const flag = countryFlag(c.country);
+    const name = getCountryName(c.country);
+    const pct = totalDips > 0 ? Math.round((c.dips / totalDips) * 100) : 0;
+    const barWidth = Math.max(4, Math.round((c.dips / maxDips) * 100));
+
+    const row = document.createElement('div');
+    row.className = 'nation-row';
+    row.innerHTML = `
+      <div class="nation-left">
+        <span class="nation-rank ${rankClass}">${rankBadge}</span>
+        <span class="nation-flag">${flag}</span>
+        <span class="nation-name">${name}</span>
+      </div>
+      <div class="nation-right">
+        <span class="nation-dips">${fmtNum(c.dips)} (${pct}%)</span>
+        <div class="nation-pct-bar">
+          <div class="nation-pct-fill" style="width: ${barWidth}%"></div>
+        </div>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+// Modal open/close
+const modalEl = document.getElementById('nationsModal');
+const openModalBtn = document.getElementById('openNationsModal');
+const closeModalBtn = document.getElementById('closeNationsModal');
+
+function openNationsModal() {
+  renderNationsModal();
+  modalEl.classList.add('open');
+}
+function closeNationsModal() {
+  modalEl.classList.remove('open');
+}
+
+openModalBtn.addEventListener('click', openNationsModal);
+closeModalBtn.addEventListener('click', closeNationsModal);
+modalEl.addEventListener('click', e => {
+  if (e.target === modalEl) closeNationsModal();
+});
+
+// Menu modal open/close
+const menuModal = document.getElementById('menuModal');
+const menuBtn = document.getElementById('menuBtn');
+const closeMenuBtn = document.getElementById('closeMenuBtn');
+const menuNationsBtn = document.getElementById('menuNationsBtn');
+
+function openMenuModal() {
+  updateDossierUI();
+  menuModal.classList.add('open');
+}
+function closeMenuModal() {
+  menuModal.classList.remove('open');
+}
+
+menuBtn.addEventListener('click', openMenuModal);
+closeMenuBtn.addEventListener('click', closeMenuModal);
+menuModal.addEventListener('click', e => {
+  if (e.target === menuModal) closeMenuModal();
+});
+menuNationsBtn.addEventListener('click', () => {
+  closeMenuModal();
+  openNationsModal();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') {
+    if (modalEl.classList.contains('open')) closeNationsModal();
+    if (menuModal.classList.contains('open')) closeMenuModal();
+  }
+});
+
+// ---- Retention: Local Dossier, Streaks & Share ----
+const RANKS = [
+  { min: 5000, title: '💎 GBP Mogul' },
+  { min: 1000, title: '👑 Grand Snack Diplomat' },
+  { min: 250,  title: '🥋 Master Dipper' },
+  { min: 50,   title: '🎖️ Dipping Specialist' },
+  { min: 10,   title: '🥢 Sauce Veteran' },
+  { min: 0,    title: '🥣 Sauce Cadet' }
+];
+
+let myDips = { tendie: 0, dimmie: 0 };
+let myStreak = { count: 1, lastDate: '' };
+
+function loadRetentionData() {
+  try {
+    const savedDips = localStorage.getItem('diplomacy_my_dips');
+    if (savedDips) myDips = JSON.parse(savedDips);
+    const savedStreak = localStorage.getItem('diplomacy_streak');
+    if (savedStreak) myStreak = JSON.parse(savedStreak);
+  } catch(e){}
+  checkDailyStreak(false);
+  updateDossierUI();
+}
+
+function saveRetentionData() {
+  try {
+    localStorage.setItem('diplomacy_my_dips', JSON.stringify(myDips));
+    localStorage.setItem('diplomacy_streak', JSON.stringify(myStreak));
+  } catch(e){}
+}
+
+function getRank(total) {
+  for (const r of RANKS) {
+    if (total >= r.min) return r.title;
+  }
+  return '🥣 Sauce Cadet';
+}
+
+function checkDailyStreak(didDip = true) {
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  if (!myStreak.lastDate) {
+    myStreak = { count: 1, lastDate: didDip ? today : '' };
+  } else if (myStreak.lastDate === today) {
+    // already dipped today
+  } else if (myStreak.lastDate === yesterday) {
+    if (didDip) {
+      myStreak.count = (myStreak.count || 1) + 1;
+      myStreak.lastDate = today;
+    }
+  } else {
+    // streak reset
+    myStreak.count = 1;
+    if (didDip) myStreak.lastDate = today;
+  }
+  if (didDip) saveRetentionData();
+}
+
+function showToast(text, duration = 2600) {
+  const t = document.getElementById('toastMsg');
+  if (!t) return;
+  t.textContent = text;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function recordUserDip(side) {
+  const prevTotal = (myDips.tendie || 0) + (myDips.dimmie || 0);
+  const prevRank = getRank(prevTotal);
+
+  myDips[side] = (myDips[side] || 0) + 1;
+  const newTotal = (myDips.tendie || 0) + (myDips.dimmie || 0);
+  const newRank = getRank(newTotal);
+
+  checkDailyStreak(true);
+  saveRetentionData();
+  updateDossierUI();
+
+  // Milestone promotion celebration
+  if (newRank !== prevRank) {
+    showToast(`🎖️ PROMOTED: ${newRank.toUpperCase()}!`, 3200);
+  }
+}
+
+function updateDossierUI() {
+  const total = (myDips.tendie || 0) + (myDips.dimmie || 0);
+  const rank = getRank(total);
+
+  const rankEl = document.getElementById('userRankBadge');
+  if (rankEl) rankEl.textContent = rank;
+  const streakEl = document.getElementById('userStreakCount');
+  if (streakEl) streakEl.textContent = Math.max(1, myStreak.count || 1);
+  const totalEl = document.getElementById('userTotalDips');
+  if (totalEl) totalEl.textContent = fmtNum(total);
+  const tendieEl = document.getElementById('userTendieDips');
+  if (tendieEl) tendieEl.textContent = fmtNum(myDips.tendie || 0);
+  const dimmieEl = document.getElementById('userDimmieDips');
+  if (dimmieEl) dimmieEl.textContent = fmtNum(myDips.dimmie || 0);
+}
+
+// Share Contribution Flex
+const shareBtn = document.getElementById('shareDipsBtn');
+if (shareBtn) {
+  shareBtn.addEventListener('click', async () => {
+    const total = (myDips.tendie || 0) + (myDips.dimmie || 0);
+    const rank = getRank(total);
+    const streak = Math.max(1, myStreak.count || 1);
+    const tPct = document.getElementById('tPct')?.textContent || '50%';
+    const dPct = document.getElementById('dPct')?.textContent || '50%';
+
+    const shareText = `I've contributed ${fmtNum(total)} dips in the Global Snack War (Rank: ${rank}, 🔥 ${streak} Day Streak)!\n🍗 Tendie ${tPct} vs 🥟 Dimmie ${dPct}. Who gets good boy points?\nhttps://dip-lomacy.com`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'Dip-lomacy · The Global Snack War',
+          text: shareText,
+          url: 'https://dip-lomacy.com'
+        });
+        return;
+      } catch (err) {}
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareText);
+      showToast('✓ Copied flex to clipboard!');
+    } catch (e) {
+      showToast('✓ Dip stats copied!');
+    }
+  });
+}
+loadRetentionData();
+
+// Live Reset Countdown Ticker
+let weekEndsTs = 0;
+function formatCountdown(targetTs) {
+  if (!targetTs) return '—';
+  const diff = Math.max(0, targetTs - Date.now());
+  const days = Math.floor(diff / 86400000);
+  const hours = Math.floor((diff % 86400000) / 3600000);
+  const mins = Math.floor((diff % 3600000) / 60000);
+  const secs = Math.floor((diff % 60000) / 1000);
+  if (days > 0) return `${days}d ${hours}h ${mins}m ${secs}s`;
+  return `${hours}h ${mins}m ${secs}s`;
+}
+
+function updateCountdown() {
+  const text = formatCountdown(weekEndsTs);
+  const el = document.getElementById('resetCountdown');
+  if (el) el.textContent = text;
+  const mEl = document.getElementById('modalResetCountdown');
+  if (mEl) mEl.textContent = text;
+}
+setInterval(updateCountdown, 1000);
+
+function updateScoreUI(d){
+  // Weekly tug-of-war bar
+  const wt = d.weekly_tendie||0, wd = d.weekly_dimmie||0;
+  const total = wt+wd;
+  const tPct = total===0 ? 50 : Math.round(wt/total*100);
+  const dPct = 100-tPct;
+  document.getElementById('warT').style.width = tPct+'%';
+  document.getElementById('warD').style.width = dPct+'%';
+  document.getElementById('tPct').textContent = tPct+'%';
+  document.getElementById('dPct').textContent = dPct+'%';
+  document.getElementById('weekTag').textContent = getWeekLabel(d.week_ends ? d.week_ends - 3600000 : Date.now());
+
+  if (d.week_ends) {
+    weekEndsTs = d.week_ends;
+    updateCountdown();
+  }
+
+  // Top nations leaderboard
+  if (d.top_countries && d.top_countries.length > 0) {
+    latestTopCountries = d.top_countries;
+    const topStr = d.top_countries.slice(0, 3).map(c => `${countryFlag(c.country)} ${fmtNum(c.dips)}`).join(' · ');
+    document.getElementById('topNations').textContent = topStr;
+    if (modalEl.classList.contains('open')) {
+      renderNationsModal();
+    }
+  }
+
+  // All-time
+  document.getElementById('atTendie').textContent = fmtNum(d.tendie_dips||0);
+  document.getElementById('atDimmie').textContent = fmtNum(d.dimmie_dips||0);
+  document.getElementById('wwTendie').textContent = d.weeks_won_tendie||0;
+  document.getElementById('wwDimmie').textContent = d.weeks_won_dimmie||0;
+  document.getElementById('menuWwTendie').textContent = d.weeks_won_tendie||0;
+  document.getElementById('menuWwDimmie').textContent = d.weeks_won_dimmie||0;
+}
+
+let ws, wsReady=false;
+function wsConnect(){
+  const proto = location.protocol==='https:'?'wss:':'ws:';
+  ws = new WebSocket(proto+'//'+location.host+'/api/ws');
+  ws.onopen = () => { wsReady=true; };
+  ws.onmessage = e => {
+    try{
+      const d = JSON.parse(e.data);
+      if(d.type==='world_dip') {
+        triggerRemoteDip(d.side, d.country, d.city);
+      } else if(d.type==='init'||d.type==='tick') {
+        updateScoreUI(d);
+      }
+    }catch(ex){}
+  };
+  ws.onclose = () => { wsReady=false; setTimeout(wsConnect, 2000); };
+  ws.onerror = () => { ws.close(); };
+}
+function wsSend(side){
+  if(wsReady) try{ ws.send(JSON.stringify({type:'dip',side})); }catch(e){}
+}
+wsConnect();
+</script>
+</body>
+</html>

@@ -89,27 +89,49 @@ styles and soggy food instead of at anybody real. Win win.
 ## 4. Tech stack
 
 Cloudflare-native, matching the owner's existing Worker projects (trash-can,
-file-share).
+file-share). See **Part II (§10–17)** for the full as-built detail; this is the
+shape.
 
-- Cloudflare Worker serves the single-page front end and the API (`src/worker.ts`).
-- Hono for routing inside the Worker.
-- One Durable Object holds authoritative global state and fans out live totals over
-  WebSocket.
-- Vite build to `./dist`, served via the Worker `assets` binding as a single-page
-  app, with `run_worker_first` for the API and WebSocket routes.
-- Front end is vanilla (no React/Tailwind here), kept clean and componentised, per
-  the handover's "no framework needed".
-- npm, single lockfile. `nodejs_compat`. Observability on.
-- Per-player state (faction, points, streak, cosmetics, sauce) in localStorage for
-  v1. Anonymous KV id is a later option only if cross-device persistence is needed.
+- Cloudflare Worker serves the API and, via the `assets` binding, the single
+  baked-in HTML page (`src/index.ts`, Hono router).
+- One Durable Object (`GlobalWarDO`, SQLite-backed) holds authoritative global state,
+  runs the anti-bot gate, fans out throttled totals, and emits live `world_dip`
+  events over WebSocket.
+- Dynamic OG share card rendered on the edge with `workers-og` (`src/og.ts`).
+- **No Vite.** The front end is a single hand-authored `assets/arena.html` with the
+  two mascot SVGs inlined at build time by `build-arena.mjs` → `dist/index.html`.
+  Vanilla JS/CSS, no framework, no bundler.
+- npm, single lockfile. `nodejs_compat`. Deploy is a **direct `wrangler deploy`**
+  (build the HTML, then deploy) — no GitHub CI in the loop.
+- Per-player state (faction) in localStorage. Global scores live only in the DO.
 
 ## 5. Repo layout
 
-- Git repo root: `dip-lomacy.com/dip-lomacy/` (remote
-  `github.com/lewifi/dip-lomacy.git`, branch `main`, no commits yet).
-- **To do**: the art currently sits one level up in `dip-lomacy.com/assets/`,
-  outside the repo. It needs to move inside the project before the build can see it,
-  matching the owner's convention where everything lives inside the project folder.
+Git root is `dip-lomacy.com/dip-lomacy/`. The art was moved inside the project (the
+old "to do" is done). Key paths:
+
+    dip-lomacy/
+      src/
+        index.ts            Hono router: /api/{og,scores,ws,health} + ASSETS fallback
+        durable_object.ts   GlobalWarDO — state, anti-bot gate, WS fan-out, rollover
+        og.ts               dynamic OG card (workers-og / Satori)
+      public/assets/
+        tendie.svg  XLB.svg          namespaced mascot art (tst/dst class prefixes)
+        favicon.svg                  Dimmie happy-face crop
+        tendie_og.png  dimmie_og.png raster mascots for the OG card
+      arena.html             THE front-end source (baked into dist/index.html)
+      build-arena.mjs        bakes arena.html + SVGs → dist/index.html, copies assets
+      dist/                  build output (deployed via the assets binding)
+      wrangler.jsonc         custom domains, DO migration, nodejs_compat
+      architecture.md
+
+`build-arena.mjs` reads `arena.html` from the project root and the namespaced SVGs
+from `public/assets/`, strips the XML prolog, substitutes `{{TENDIE_SVG}}` /
+`{{DIMMIE_SVG}}`, and writes `dist/index.html` plus copies of `public/assets/` and
+`favicon.svg`. A duplicate `arena.html` also sits one level up in
+`dip-lomacy.com/assets/` alongside the throwaway `diptuner.html` sauce-tuner
+workbench; the project-root copy is the one that gets built — keep them in sync or
+collapse to one.
 
 ## 6. Art inventory and rig notes
 
@@ -146,13 +168,19 @@ Decisions from the art:
   share the same eye geometry, Dimmie's brow/mouth vocabulary can be borrowed to build
   Tendie's set. **Borrow the rig, retune the emotion**: Dimmie's shapes are drawn for
   quiet menace, Tendie's must read golden-retriever (a furious Tendie is a big hurt
-  tantrum, brows up and pleading, not cold). Still to be built for Tendie: the losing
-  faces. Dimmie's six are done.
+  tantrum, brows up and pleading, not cold). **Done:** both mascots now carry all six
+  faces. `tendie.svg` has `Face_{Happy,Stunned,Angry,Surprised,Begging,Worried}` —
+  Begging and Worried were the last two, ported from Dimmie's `XLB_*` groups (dst→tst
+  class rename, class styles flattened to inline fills, positioning transform added).
+  The `FACES` config and `EXPR_FACES` pool in `arena.html` drive the swaps.
 - **Expressions are dip-triggered, not a static standings readout.** At rest the
   mascot holds a baseline face. The moment a dip is committed, the face reacts to who
   is winning at that instant (smug if ahead, worried or scared if losing), so the war
   is *felt* on every dip rather than read off a passive mood indicator. Purely
   standings-driven in v1, no depth scaling (the depth idea is parked, see section 9).
+  **As built:** the dipping mascot pulls a *random* face from `EXPR_FACES` on each
+  dip, and the *opponent* is forced to the angry face for a beat — the un-dipped side
+  visibly reacts to being scored on.
 - **"XLB" ids are left as-is.** The filename and internal group ids contain "XLB". We
   are not sanitising them: the art is already visibly a specific dumpling, a group id
   only visible in devtools is not the surface that matters, and sanitising would be
@@ -256,8 +284,8 @@ misnamed `#dip` (now `#bowl`), so no ranch-cup asset needs drawing.
   soup), built as stacked art layers, cute-wrecked not gross, permanent and shared.
 - Type: **Bungee Shade** for logo and major titles, **Space Mono** for everything
   else, both self-hosted.
-- Stack: Cloudflare Worker + Hono + single Durable Object + WebSocket fan-out, Vite,
-  vanilla front end, npm, localStorage for per-player state.
+- Stack: Cloudflare Worker + Hono + single Durable Object + WebSocket fan-out,
+  `build-arena.mjs` (no Vite), vanilla front end, npm, localStorage for faction.
 - Broadcast is a throttled aggregate (target ~10 Hz), not one message per dip, so the
   DO survives the viral case. Counters stay exact; only the wire is throttled. Client
   increments its own dip optimistically and reconciles to server truth on each tick.
@@ -285,17 +313,17 @@ misnamed `#dip` (now `#bowl`), so no ranch-cup asset needs drawing.
 
 ## 8. Open questions
 
-1. **Anti-bot posture for v1.** Every client can hit the dip endpoint, so the war is
-   trivially botted. Decide how dips get gated (do nothing, per-connection rate limit
-   in the DO, or Turnstile on bursts). Shapes the dip endpoint.
-2. **Identity and persistence.** Confirm localStorage-only is acceptable for launch
-   (cleared cache wipes streak and points, no cross-device), or bring the anonymous
-   KV id in from the start.
-3. **Sauce Bowl period length.** The "keep-it-live" question is now resolved by the
-   Sauce Bowl event structure (section 7). Remaining knob: how long a Bowl runs. Long
-   enough that a title feels earned (weekly-ish); too frequent makes rings cheap.
-4. **Broadcast tick rate.** Confirm ~10 Hz aggregate is the right feel versus
-   something slower.
+1. ~~**Anti-bot posture for v1.**~~ **Resolved — built.** Dips are gated entirely
+   server-side in the DO: a multi-layer per-IP gate (token bucket + velocity limit +
+   jitter/streak analysis + a human cooldown penalty box). See §13.
+2. ~~**Identity and persistence.**~~ **Resolved.** localStorage-only for launch; the
+   only per-player state is the chosen faction. All scores are global in the DO, so
+   there is nothing per-player to lose on a cache wipe.
+3. **Sauce Bowl period length.** Shipped as a **strict weekly** cadence: Monday
+   00:00 UTC rollover (§12). Remaining knob is whether weekly is the right feel long
+   term or it should stretch/shorten.
+4. ~~**Broadcast tick rate.**~~ **Resolved.** ~10 Hz aggregate (100 ms window),
+   plus separate instantaneous `world_dip` events (§11, §14).
 
 ## 9. Parked / future ideas (icebox)
 
@@ -320,3 +348,150 @@ Deliberately not in v1, kept here so they are not lost.
 - **Red packet cosmetic.** Opt-in skin in the personal cosmetics shelf (not a
   currency), where a player choosing it is emergent flavour rather than assigned
   identity.
+
+---
+
+# Part II — As-built implementation
+
+Sections 1–9 are the design brief. This part documents what actually ships today, so
+the two stay honestly separated. Where they disagree, Part II wins.
+
+## 10. Request routing (`src/index.ts`)
+
+A Hono app on the Worker. All state lives in a single DO instance addressed by the
+fixed name `global-war-v1` (`idFromName`), so every visitor worldwide shares one war.
+
+| Route | Method | Behaviour |
+|---|---|---|
+| `/api/ws` | GET (Upgrade) | Validates the `websocket` upgrade, stamps the request with `X-Client-Country` / `X-Client-City` / `CF-Connecting-IP` from the Cloudflare edge (`req.cf` + headers), forwards to the DO. |
+| `/api/scores` | GET | Fetches the DO's plain-GET JSON payload; `Cache-Control: max-age=10`. |
+| `/api/og` | GET | `handleOG(env)` — dynamic PNG share card (§15). |
+| `/api/health` | GET | `{ status: 'ok', version }`. |
+| `*` | ALL | Falls through to the `ASSETS` binding (the baked `dist/index.html` + assets). |
+
+The DO's `fetch()` double-duties: a non-WebSocket request returns the current scores
+as JSON (this is what `/api/scores` and the OG card read); a WebSocket upgrade opens
+a live connection. Same `buildPayload()` feeds both.
+
+## 11. Real-time protocol (WebSocket)
+
+Client ↔ DO over `/api/ws`. Messages are JSON with a `type` discriminator.
+
+**Client → server:** `{ type: 'dip', side: 'tendie' | 'dimmie' }`. Nothing else is
+trusted; the client cannot send counts, only single dip intents, each independently
+gated (§13).
+
+**Server → client:**
+- `init` — sent once on connect (and as the plain-GET body): full current state.
+- `tick` — throttled aggregate update, ~10 Hz (100 ms window), only when state is
+  dirty. Carries the same shape as `init`.
+- `world_dip` — **instantaneous**, fired to every *other* connected socket the moment
+  a dip commits: `{ type, side, country, city }`. This is the "you can see someone
+  else dip, live, from another country" feature (§14).
+
+Shared payload (`init`/`tick`) fields: `tendie_dips`, `dimmie_dips` (all-time),
+`weekly_tendie`, `weekly_dimmie` (this week), `weeks_won_tendie`, `weeks_won_dimmie`,
+`week_ends` (ms timestamp of the current week's Monday-00:00-UTC boundary), and
+`top_countries` (top-50 `{country, dips}`, excluding unknown `XX`).
+
+Counters stay exact; only the wire is throttled. The client increments its own dip
+optimistically and reconciles to server truth on each `tick`. Auto-reconnect on the
+client keeps the socket alive across drops.
+
+## 12. Scoring model & weekly rollover (`GlobalWarDO`)
+
+Three tallies, persisted in DO SQLite storage:
+- **All-time** `tendie_dips` / `dimmie_dips` — the forever "damage" number.
+- **This week** `weekly_tendie` / `weekly_dimmie` — the live winnable contest.
+- **Weeks won** `weeks_won_tendie` / `weeks_won_dimmie` — the championship tally.
+
+**Rollover** (`maybeRollover`, checked on every connect, dip, and plain GET): the week
+boundary is the most recent **Monday 00:00 UTC** (`getMonday`) plus 7 days. When the
+stored week has elapsed, the higher weekly total earns a "week won" (**ties go
+uncounted**), weekly totals reset to 0, and `week_start` advances. There is no
+scheduled DO alarm — rollover is lazy, triggered by the next interaction, which is
+fine because there is effectively always traffic.
+
+**Country breakdown** `country_dips` — a `{ country: count }` map, incremented on each
+dip from the socket's edge-detected country (unknown `XX` excluded), surfaced as the
+top-50 leaderboard in the payload.
+
+## 13. Anti-bot gate (server-side, per-IP)
+
+Every dip runs the gate in `webSocketMessage` before it counts. IP comes from
+`CF-Connecting-IP`. Per-IP state (`ipStates`): token bucket, recent-dip timestamps,
+active socket count, a permanent-bot flag, and a cooldown deadline. Layers, in order:
+
+1. **Physical animation gate** — drop anything faster than `MIN_DIP_INTERVAL_MS`
+   (80 ms ≈ 12 dips/sec ceiling for multi-finger).
+2. **Permanent bot flag** — once set, all dips from that IP are silently dropped.
+3. **Human cooldown penalty box** — if `cooldownUntil` is in the future, ignore;
+   when it expires, restore the IP to clean standing.
+4. **Token bucket + velocity** — capacity 50, refill 5/sec; also a hard
+   `MAX_DIPS_PER_MINUTE` (250) rolling cap. Running dry → 15 s human cooldown.
+5. **Continuous-streak** — >150 rapid dips with no breather → 15 s cooldown.
+6. **Jitter analysis (hard bot kill)** — over the last ~12 intervals, if the timing
+   stdDev < 12 ms (inhumanly regular, i.e. an autoclicker), set `permanentBot`.
+
+Plus **max 4 concurrent sockets per IP** — exceeding it flips `permanentBot`. The
+philosophy is generous to a frantic human (a high-energy clicker profile) but
+unforgiving to mechanically regular timing. All limits are tunable constants at the
+top of `durable_object.ts`.
+
+## 14. Global live dips (`world_dip`)
+
+When a dip passes the gate, the DO fans a `world_dip` event out to every *other*
+socket. The front end renders each as a short-lived floating bubble (the
+`bubbleFloat` animation) tinted to the dipping side and tagged with the origin
+country/city, plus a live ticker with a pulsing dot. Effect: the arena feels
+inhabited — you watch dips landing from around the world in real time, not just a
+number ticking. This is separate from and faster than the aggregated `tick`.
+
+## 15. Dynamic OG share card (`src/og.ts`)
+
+A 1200×630 PNG rendered on the edge with `workers-og` (Satori + resvg-wasm),
+composed via `React.createElement` (no JSX build step). Adapted from the owner's
+proven ephix.net share-card worker.
+
+- Reads **live scores** from the DO, so the card always shows the current
+  tug-of-war, all-time score, weeks-won, and week label.
+- **Mascots**: `tendie_og.png` / `dimmie_og.png` loaded from the `ASSETS` binding
+  once per isolate, cached as base64 data URIs, flanking the card.
+- **Fonts**: Bungee Shade (title) + Space Mono (chrome) fetched from the jsDelivr
+  Fontsource CDN, cached per isolate.
+- Wood-grain background, centre tug-of-war bar with live percentages, tagline
+  "WHO WILL GET GOOD BOY POINTS?", `DIP-LOMACY.COM` badge.
+- `Cache-Control: max-age=300, s-maxage=600` — fresh enough to feel live, cached
+  enough to survive a share storm. Errors return JSON 500 (debuggable) rather than a
+  broken image.
+
+`arena.html` points `og:image` / `twitter:image` at `/api/og`.
+
+## 16. Favicon
+
+`public/assets/favicon.svg` — Dimmie's happy face cropped to
+`viewBox="620 340 820 600"` (Main_Dumpling + `XLB_Face_Happy` with the needed style
+defs). Referenced as `<link rel="icon" type="image/svg+xml" href="/favicon.svg">`;
+`build-arena.mjs` copies it to `dist/`.
+
+## 17. Mobile & front-end polish (`arena.html`)
+
+- `viewport-fit=cover`, `100dvh`, `touch-action: manipulation`, `safe-area-inset`
+  padding so the layout survives notches and mobile browser chrome.
+- Pull-to-refresh indicator; faction label pills lifted to sit just above the footer.
+- Live ticker (pulsing dot) and the floating `world_dip` bubbles (§14).
+- "made by ephix" pulse link → ephix.net in the all-time footer.
+- Two SVGs are inlined into one document, so their internal CSS is **namespaced**
+  (`tst`/`dst` class prefixes, baked into the SVGs in `public/assets/`) to stop the
+  two stylesheets colliding.
+
+## 18. Build & deploy
+
+    npm run build   # node build-arena.mjs  → dist/index.html (+ assets, favicon)
+    npx wrangler deploy
+
+Direct deploy, no GitHub CI. `wrangler.jsonc` binds the custom domains
+`dip-lomacy.com` / `www.dip-lomacy.com`, the `GlobalWarDO` (SQLite migration), the
+`ASSETS` binding to `./dist`, and `nodejs_compat`. A schema-version flag
+(`schema_version`) in DO storage handles one-time migrations — v2 was the launch
+reset of all scores to 0.
