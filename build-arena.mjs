@@ -11,10 +11,13 @@ const tendie = (await readFile(join(root, 'public', 'assets', 'tendie.svg'), 'ut
   .replace(/<\?xml[^>]*\?>/, '');
 const dimmie = (await readFile(join(root, 'public', 'assets', 'XLB.svg'), 'utf8'))
   .replace(/<\?xml[^>]*\?>/, '');
+const cheese = (await readFile(join(root, 'public', 'assets', 'cheesey.svg'), 'utf8'))
+  .replace(/<\?xml[^>]*\?>/, '');
 
 const out = arena
   .replace('{{TENDIE_SVG}}', () => tendie)
-  .replace('{{DIMMIE_SVG}}', () => dimmie);
+  .replace('{{DIMMIE_SVG}}', () => dimmie)
+  .replace('{{CHEESE_SVG}}', () => cheese);
 
 await mkdir(join(root, 'dist'), { recursive: true });
 await writeFile(join(root, 'dist', 'index.html'), out, 'utf8');

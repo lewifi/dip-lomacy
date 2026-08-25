@@ -111,10 +111,10 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
 .dip-bubble.tendie-bubble{ border:1.5px solid #d97706; color:#b45309; }
 .dip-bubble.dimmie-bubble{ border:1.5px solid #dc2626; color:#b91c1c; }
 @keyframes bubbleFloat {
-  0%   { opacity:0; transform:translate(-50%, 8px) scale(0.6); }
-  15%  { opacity:1; transform:translate(-50%, -4px) scale(1.08); }
-  35%  { opacity:1; transform:translate(-50%, -18px) scale(1); }
-  100% { opacity:0; transform:translate(-50%, -75px) scale(0.85); }
+  0%   { opacity:0; transform:translate(-50%, -4px) scale(0.65); }
+  15%  { opacity:1; transform:translate(-50%, 6px) scale(1.05); }
+  35%  { opacity:1; transform:translate(-50%, 14px) scale(1); }
+  100% { opacity:0; transform:translate(-50%, 36px) scale(0.9); }
 }
 
 /* ---- Live ticker ---- */
@@ -153,6 +153,23 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
 }
 .svg-wrap svg{ width:100%; height:auto; display:block; overflow:visible; }
 
+/* ---- The Ringmaster (Cheesey) — co-registered on the shared 2160x1672 canvas ---- */
+.ringmaster{
+  position:absolute; inset:0; z-index:4; pointer-events:none;
+  display:flex; align-items:center; justify-content:center;
+}
+.ringmaster > svg{ width:min(72vh, 600px, 46vw); height:auto; display:block; overflow:visible; }
+/* Jump pivots from Cheesey's own feet, wherever he sits on the canvas */
+.ringmaster .cheese-rotor{ transform-box:fill-box; transform-origin:50% 100%; }
+@keyframes cheeseHop{
+  0%   { transform:translateY(0)    scaleX(1)    scaleY(1); }
+  25%  { transform:translateY(0)    scaleX(1.07) scaleY(0.90); }  /* fat squash */
+  50%  { transform:translateY(-7%)  scaleX(0.96) scaleY(1.05); }  /* slight hop */
+  72%  { transform:translateY(0)    scaleX(1.06) scaleY(0.93); }  /* land squash */
+  100% { transform:translateY(0)    scaleX(1)    scaleY(1); }
+}
+.ringmaster.jumping .cheese-rotor{ animation:cheeseHop .4s ease-out; }
+
 /* ---- Pull to refresh indicator ---- */
 .pull-refresh-indicator{
   position:fixed; top:-60px; left:50%; transform:translateX(-50%);
@@ -190,9 +207,6 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
 }
 .alltime .num{ color:#0a0a0a; font-size:13px; }
 .alltime .sep{ opacity:.3; }
-.alltime .made-by{ margin-left:auto; font-size:11px; letter-spacing:1.5px; opacity:.45; }
-.alltime .made-by a{ color:inherit; text-decoration:none; }
-.alltime .made-by a:hover{ opacity:1; text-decoration:underline; }
 
 /* ---- Animations ---- */
 @keyframes gloop {
@@ -319,9 +333,6 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   }
   .alltime .nations-badge {
     display: none;
-  }
-  .alltime .made-by {
-    display: inline;
   }
 }
 
@@ -647,7 +658,6 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
     <span class="weeks-won-wrap">Weeks Won: <span class="num" id="wwTendie">0</span> – <span class="num" id="wwDimmie">0</span></span>
     <span class="sep">|</span>
     <span class="reset-wrap">Resets in: <span class="num" id="resetCountdown">—</span></span>
-    <span class="made-by">made by <a href="https://ephix.net" target="_blank" rel="noopener">ephix pulse</a></span>
   </div>
 
   <!-- Nations Modal Popup -->
@@ -775,6 +785,9 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
       <div class="faction-label dimmie-label">DIMMIE</div>
     </div>
   </div>
+
+  <!-- The Ringmaster: Cheesey (his SVG), static face, a slight fat jump on every dip -->
+  <div class="ringmaster" id="ringmaster" aria-hidden="true">{{CHEESE_SVG}}</div>
 </div>
 
 <template id="tpl-tendie">{{TENDIE_SVG}}</template>
@@ -975,11 +988,12 @@ const canvas = document.getElementById('splash');
 const ctx = canvas.getContext('2d');
 let drops = [], stains = [], persistentStains = [];
 
-// Load persistent battle scars from localStorage
+// Load persistent battle scars from localStorage (capped to clean max)
 try {
   const savedScars = localStorage.getItem('diplomacy_battle_scars');
   if(savedScars) {
     persistentStains = JSON.parse(savedScars) || [];
+    if(persistentStains.length > 20) persistentStains = persistentStains.slice(-20);
   }
 } catch(e){}
 
@@ -997,13 +1011,13 @@ function addStainsForSide(side, count){
   const bw = rig?.bowlRect?.w || 140;
   for(let i=0; i<count; i++){
     const ang = Math.random() * Math.PI * 2;
-    const dist = (bw * 0.25) + Math.random() * (bw * 0.52);
+    const dist = (bw * 0.25) + Math.random() * (bw * 0.45);
     const ox = Math.cos(ang) * dist;
-    const oy = bw * 0.12 + Math.abs(Math.sin(ang)) * 28 + (Math.random() * 20);
+    const oy = bw * 0.12 + Math.abs(Math.sin(ang)) * 22 + (Math.random() * 14);
     persistentStains.push({
       ox, oy,
-      r: 3.5 + Math.random() * 6.5,
-      peak: side === 'tendie' ? (0.36 + Math.random() * 0.22) : (0.45 + Math.random() * 0.28),
+      r: 3 + Math.random() * 5,
+      peak: side === 'tendie' ? (0.32 + Math.random() * 0.18) : (0.38 + Math.random() * 0.22),
       color: SAUCE[side].stain,
       side
     });
@@ -1012,8 +1026,8 @@ function addStainsForSide(side, count){
 }
 
 function syncBattleScarsToScore(tendieDips, dimmieDips){
-  const targetTendie = Math.min(80, Math.max(16, Math.floor(Math.sqrt(tendieDips || 100) * 0.85)));
-  const targetDimmie = Math.min(80, Math.max(16, Math.floor(Math.sqrt(dimmieDips || 100) * 0.85)));
+  const targetTendie = Math.min(10, Math.max(3, Math.floor(Math.sqrt(tendieDips || 100) * 0.3)));
+  const targetDimmie = Math.min(10, Math.max(3, Math.floor(Math.sqrt(dimmieDips || 100) * 0.3)));
   
   const currentTendie = persistentStains.filter(s => s.side === 'tendie').length;
   const currentDimmie = persistentStains.filter(s => s.side === 'dimmie').length;
@@ -1027,9 +1041,9 @@ function syncBattleScarsToScore(tendieDips, dimmieDips){
 }
 
 function seedBattleScars(){
-  if(persistentStains.length < 24){
-    addStainsForSide('tendie', 14);
-    addStainsForSide('dimmie', 14);
+  if(persistentStains.length < 8){
+    addStainsForSide('tendie', 4);
+    addStainsForSide('dimmie', 4);
   }
 }
 
@@ -1090,9 +1104,9 @@ function spawnDipBubble(side, country, city, isLocal = false) {
   const locationText = isLocal ? 'YOU +1' : (city ? `${city} +1` : `${country} +1`);
   el.innerHTML = `<span>${flag}</span><span>${locationText}</span>`;
   
-  // Position over the center of the dipping bowl
+  // Position cleanly below the dipping bowl so it never blocks the mascot or dip
   el.style.left = rig.bowlRect.x + 'px';
-  el.style.top = (rig.bowlRect.y - 14) + 'px';
+  el.style.top = (rig.bowlRect.y + (rig.bowlRect.w || 140) * 0.28) + 'px';
   document.getElementById('bubbleLayer').appendChild(el);
   setTimeout(() => el.remove(), 1850);
 }
@@ -1110,9 +1124,24 @@ function addTickerDip(side, country, city) {
 }
 
 // ---- Dip trigger ----
+// ---- Cheesey the Ringmaster: a slight fat hop on every dip (throttled ~5/sec) ----
+const ringmasterEl = document.getElementById('ringmaster');
+let rmLastJump = 0;
+function ringmasterJump(){
+  if(!ringmasterEl) return;
+  const now = performance.now();
+  if(now - rmLastJump < 200) return; // throttle so a mash-storm reads as lively, not a blur
+  rmLastJump = now;
+  ringmasterEl.classList.remove('jumping');
+  void ringmasterEl.offsetWidth; // reflow to restart the animation
+  ringmasterEl.classList.add('jumping');
+  ringmasterEl.addEventListener('animationend', () => ringmasterEl.classList.remove('jumping'), { once:true });
+}
+
 function triggerDip(side, isRemote = false){
   const rig = rigs[side];
   if(!rig) return;
+  ringmasterJump();
   const P = PRESETS[side];
   const [pivotX,pivotY] = P.pivot;
   const A = P.angle;
@@ -1195,7 +1224,7 @@ function tick(){
   if(rigs.tendie) updateWave(rigs.tendie);
   if(rigs.dimmie) updateWave(rigs.dimmie);
 
-  // 1. Persistent dried sauce stains (battle scars)
+  // 1. Persistent dried sauce stains (optimized soft alpha circles)
   for(let i=0; i<persistentStains.length; i++){
     const ps = persistentStains[i];
     const rig = rigs[ps.side];
@@ -1204,11 +1233,8 @@ function tick(){
     const sx = (ps.ox !== undefined) ? (bx + ps.ox) : (ps.x || bx);
     const sy = (ps.oy !== undefined) ? (by + ps.oy) : (ps.y || by);
     ctx.save(); ctx.translate(sx, sy); ctx.scale(1, 0.42);
-    const g = ctx.createRadialGradient(0,0,0,0,0,ps.r);
-    g.addColorStop(0, ps.color.replace('ALPHA', ps.peak.toFixed(3)));
-    g.addColorStop(0.65, ps.color.replace('ALPHA', (ps.peak * 0.75).toFixed(3)));
-    g.addColorStop(1, ps.color.replace('ALPHA', '0'));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,ps.r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = ps.color.replace('ALPHA', (ps.peak * 0.65).toFixed(2));
+    ctx.beginPath(); ctx.arc(0,0,ps.r,0,Math.PI*2); ctx.fill();
     ctx.restore();
   }
 
@@ -1218,13 +1244,10 @@ function tick(){
     const fadeMs = PRESETS[s.side].splash.fadeS*1000;
     const life = (now-s.born)/fadeMs;
     if(life>=1){ stains.splice(i,1); continue; }
-    const peak = (1-life)*0.6;
+    const peak = (1-life)*0.55;
     ctx.save(); ctx.translate(s.x,s.y); ctx.scale(1,0.4);
-    const g = ctx.createRadialGradient(0,0,0,0,0,s.r);
-    g.addColorStop(0, s.color.replace('ALPHA',peak.toFixed(3)));
-    g.addColorStop(0.6, s.color.replace('ALPHA',(peak*0.75).toFixed(3)));
-    g.addColorStop(1, s.color.replace('ALPHA','0'));
-    ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,s.r,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle = s.color.replace('ALPHA',peak.toFixed(2));
+    ctx.beginPath(); ctx.arc(0,0,s.r,0,Math.PI*2); ctx.fill();
     ctx.restore();
   }
 
@@ -1233,18 +1256,18 @@ function tick(){
     const d = drops[i];
     d.vy+=0.35; d.x+=d.vx; d.y+=d.vy;
     if(d.y>=d.tableY){
-      stains.push({x:d.x,y:d.tableY,r:d.r*1.6+Math.random()*4,born:now,color:SAUCE[d.side].stain,side:d.side});
+      stains.push({x:d.x,y:d.tableY,r:d.r*1.4+Math.random()*3,born:now,color:SAUCE[d.side].stain,side:d.side});
       
-      // Chance to leave a permanent dried battle scar on the table
-      if(Math.random() < 0.45){
+      // Chance to leave a permanent dried battle scar on the table (capped to 20)
+      if(Math.random() < 0.35){
         const rig = rigs[d.side];
         const ox = rig?.bowlRect ? (d.x - rig.bowlRect.x) : 0;
         const oy = rig?.bowlRect ? (d.tableY - rig.bowlRect.y) : 0;
-        if(persistentStains.length >= 70) persistentStains.shift();
+        if(persistentStains.length >= 20) persistentStains.shift();
         persistentStains.push({
           ox, oy,
-          r: d.r * 1.5 + Math.random() * 4,
-          peak: d.side === 'tendie' ? (0.36 + Math.random() * 0.22) : (0.45 + Math.random() * 0.28),
+          r: d.r * 1.3 + Math.random() * 3,
+          peak: d.side === 'tendie' ? (0.30 + Math.random() * 0.18) : (0.35 + Math.random() * 0.20),
           color: SAUCE[d.side].stain,
           side: d.side
         });
@@ -1335,8 +1358,8 @@ let lastUserDipTime = 0;
 function handleUserDip(side){
   const now = Date.now();
   const elapsed = now - lastUserDipTime;
-  if(elapsed < 5000){
-    const remaining = Math.ceil((5000 - elapsed) / 1000);
+  if(elapsed < 2000){
+    const remaining = Math.ceil((2000 - elapsed) / 1000);
     showToast(`⏳ Slow down! Wait ${remaining}s before dipping.`);
     return;
   }

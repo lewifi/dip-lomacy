@@ -47,6 +47,8 @@ interface IpRateState {
   activeSockets: number;
   permanentBot: boolean; // hard kill for obvious robotic scripts
   cooldownUntil: number; // 3-minute auto-decay penalty box for hyperactive humans
+  lastSlowDipTime?: number; // 30s fixed cadence gate for visual dips
+  lastSlowScoreTime?: number; // 10-minute cadence gate for official scoreboard increments
 }
 
 export interface CountryScore {
@@ -74,13 +76,20 @@ function hashIp(ip: string): string {
   return (h >>> 0).toString(36).slice(0, 6);
 }
 
-// Rate limiting parameters (5-second rate limited dipper profile)
+// Rate limiting parameters (2-second rate limited dipper profile)
 const BUCKET_CAPACITY = 150;
 const TOKEN_REFILL_RATE = 12.0; // tokens per second
-const MIN_DIP_INTERVAL_MS = 5000; // hard 5-second minimum interval between dips
+const MIN_DIP_INTERVAL_MS = 1800; // hard 1.8-second server-side minimum interval between dips (200ms latency buffer)
 const MAX_DIPS_PER_MINUTE = 600; // generous session headroom (up to 10 dips/sec sustained)
 const MAX_CONCURRENT_SOCKETS_PER_IP = 15;
 const HUMAN_COOLDOWN_MS = 5 * 1000; // 5-second short breather if capacity fully exhausted
+
+// Slow-lane: IPs throttled to a 30s visual dip cadence, 10-minute scoreboard count
+const SLOW_LANE_IPS = new Set([
+  '193.32.127.221',
+]);
+const SLOW_LANE_INTERVAL_MS = 30 * 1000; // 30 seconds
+const SLOW_LANE_SCORE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
 
 export class GlobalWarDO extends DurableObject<Env> {
   // All-time totals
@@ -110,27 +119,41 @@ export class GlobalWarDO extends DurableObject<Env> {
     this.ctx.blockConcurrencyWhile(async () => {
       const s = this.ctx.storage;
 
-      // v2: reset all scores to 0 for real launch (runs once)
-      const version = await s.get<number>('schema_version');
-      if (version !== 2) {
-        await s.put('tendie_dips', 0);
-        await s.put('dimmie_dips', 0);
-        await s.put('weekly_tendie', 0);
-        await s.put('weekly_dimmie', 0);
+      // v4: Restore exact scores from snapshot and apply Swiss -5k deduction
+      const version = (await s.get<number>('schema_version')) ?? 0;
+      if (version < 4) {
+        const restoredCountries: Record<string, number> = {
+          AU: 5447,
+          CH: 4314, // 9314 - 5000
+          US: 1044,
+          CA: 428,
+          NO: 253,
+          TR: 110,
+          CO: 101,
+          MX: 78,
+          SG: 45,
+          GB: 41,
+          DE: 35,
+          BR: 29,
+          FR: 8,
+          BE: 6,
+          IN: 2,
+        };
+        await s.put('tendie_dips', 6604);
+        await s.put('dimmie_dips', 5350); // 10350 - 5000
+        await s.put('weekly_tendie', 6604);
+        await s.put('weekly_dimmie', 5350); // 10350 - 5000
         await s.put('week_start', getMonday());
         await s.put('weeks_won_tendie', 0);
         await s.put('weeks_won_dimmie', 0);
-        await s.put('country_dips', {});
-        await s.put('schema_version', 2);
+        await s.put('country_dips', restoredCountries);
+        await s.put('schema_version', 4);
       }
 
-      const storedTendie = await s.get<number>('tendie_dips');
-      const storedDimmie = await s.get<number>('dimmie_dips');
-      if (storedTendie !== undefined) this.tendieDips = storedTendie;
-      if (storedDimmie !== undefined) this.dimmieDips = storedDimmie;
-
-      this.weeklyTendie = (await s.get<number>('weekly_tendie')) ?? 0;
-      this.weeklyDimmie = (await s.get<number>('weekly_dimmie')) ?? 0;
+      this.tendieDips = (await s.get<number>('tendie_dips')) ?? 6604;
+      this.dimmieDips = (await s.get<number>('dimmie_dips')) ?? 5350;
+      this.weeklyTendie = (await s.get<number>('weekly_tendie')) ?? 6604;
+      this.weeklyDimmie = (await s.get<number>('weekly_dimmie')) ?? 5350;
       this.weekStart = (await s.get<number>('week_start')) ?? getMonday();
       this.weeksWonTendie = (await s.get<number>('weeks_won_tendie')) ?? 0;
       this.weeksWonDimmie = (await s.get<number>('weeks_won_dimmie')) ?? 0;
@@ -361,7 +384,27 @@ export class GlobalWarDO extends DurableObject<Env> {
 
         const count = Math.max(1, Math.min(typeof data.count === 'number' ? Math.floor(data.count) : 1, 100));
         const now = Date.now();
-        const interval = meta.lastDipTime > 0 ? now - meta.lastDipTime : 1000;
+
+        // 0. Slow-Lane Cadence Gates (30s visual dip, 10min scoreboard count)
+        let countsTowardsScore = true;
+        if (SLOW_LANE_IPS.has(meta.ip)) {
+          const slowIpState = this.ipStateFor(meta.ip);
+          const lastSlow = slowIpState.lastSlowDipTime || 0;
+          if (lastSlow > 0 && now - lastSlow < SLOW_LANE_INTERVAL_MS) {
+            // Still in 30s cooldown — drop silently
+            return;
+          }
+          slowIpState.lastSlowDipTime = now;
+
+          const lastScore = slowIpState.lastSlowScoreTime || 0;
+          if (lastScore > 0 && now - lastScore < SLOW_LANE_SCORE_INTERVAL_MS) {
+            countsTowardsScore = false; // visual animation only, no score increment
+          } else {
+            slowIpState.lastSlowScoreTime = now;
+          }
+        }
+
+        const interval = meta.lastDipTime > 0 ? now - meta.lastDipTime : Infinity;
 
         // 1. Hard Physical Animation Gate (drop single clicks faster than MIN_DIP_INTERVAL_MS)
         if (count === 1 && interval < MIN_DIP_INTERVAL_MS) {
@@ -425,7 +468,7 @@ export class GlobalWarDO extends DurableObject<Env> {
         }
 
         // 6. Robotic Autoclicker Jitter Analysis (Hard Bot Kill) - only for unbatched single clicks
-        if (count === 1) {
+        if (count === 1 && interval !== Infinity) {
           meta.dipIntervals.push(interval);
           if (meta.dipIntervals.length > 15) {
             meta.dipIntervals.shift();
@@ -451,21 +494,26 @@ export class GlobalWarDO extends DurableObject<Env> {
         // Check for rollover before counting
         this.maybeRollover();
 
-        // Commit dip to both all-time and weekly totals
-        if (data.side === 'tendie') {
-          this.tendieDips += count;
-          this.weeklyTendie += count;
-        } else {
-          this.dimmieDips += count;
-          this.weeklyDimmie += count;
-        }
+        // Commit dip to both all-time and weekly totals if counted
+        if (countsTowardsScore) {
+          if (data.side === 'tendie') {
+            this.tendieDips += count;
+            this.weeklyTendie += count;
+          } else {
+            this.dimmieDips += count;
+            this.weeklyDimmie += count;
+          }
 
-        if (meta.country && meta.country !== 'XX') {
-          this.countryDips[meta.country] = (this.countryDips[meta.country] || 0) + count;
+          if (meta.country && meta.country !== 'XX') {
+            this.countryDips[meta.country] = (this.countryDips[meta.country] || 0) + count;
+          }
+
+          this.dirty = true;
+          this.scheduleBroadcast();
         }
 
         // DEBUG: per-dip trace for `wrangler tail` — source is a hashed IP (no PII).
-        console.log(`DIP ${data.side} count=${count} ${meta.country} ${hashIp(meta.ip)}`);
+        console.log(`DIP ${data.side} count=${count} counted=${countsTowardsScore} ${meta.country} ${hashIp(meta.ip)}`);
 
         // Broadcast instantaneous live dip event to all other active clients
         const worldDipPayload = JSON.stringify({
@@ -485,9 +533,6 @@ export class GlobalWarDO extends DurableObject<Env> {
             }
           }
         }
-
-        this.dirty = true;
-        this.scheduleBroadcast();
       }
     } catch (e) {
       // Ignore malformed client payloads
