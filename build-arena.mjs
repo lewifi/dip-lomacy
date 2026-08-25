@@ -35,4 +35,11 @@ try {
   console.log('Copied favicon.svg to dist/');
 } catch { console.log('⚠ No favicon.svg found in public/assets/'); }
 
+// Copy service worker to dist root (must be served from root scope)
+try {
+  const sw = await readFile(join(root, 'public', 'sw.js'), 'utf8');
+  await writeFile(join(root, 'dist', 'sw.js'), sw, 'utf8');
+  console.log('Copied sw.js to dist/');
+} catch { console.log('⚠ No sw.js found in public/'); }
+
 console.log(`Built dist/index.html (${(out.length / 1024).toFixed(0)} KB)`);

@@ -340,11 +340,93 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
 .burger-btn:active{
   transform:scale(0.95);
 }
+/* Attention pulse — stops once the menu has been opened */
+@keyframes burgerPulse{
+  0%,100%{ box-shadow:0 2px 8px rgba(0,0,0,0.1), 0 0 0 0 rgba(245,158,11,0.55); }
+  50%    { box-shadow:0 2px 8px rgba(0,0,0,0.1), 0 0 0 9px rgba(245,158,11,0); }
+}
+.burger-btn.pulsing{ animation:burgerPulse 2.2s ease-out infinite; }
 @media (max-width: 768px), (orientation: portrait){
   .burger-btn{
     top:8px; right:10px; width:34px; height:34px;
   }
 }
+
+/* ---- War Room chat ---- */
+.chat-pill{
+  position:fixed; left:18px; bottom:calc(60px + env(safe-area-inset-bottom)); z-index:35;
+  display:flex; align-items:center; gap:7px;
+  padding:9px 15px; border-radius:999px; border:1.5px solid rgba(0,0,0,0.12);
+  background:rgba(255,255,255,0.92); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
+  color:#1e1208; font-weight:700; font-size:12.5px; letter-spacing:.5px; cursor:pointer;
+  box-shadow:0 3px 12px rgba(0,0,0,0.15); transition:transform .15s ease, box-shadow .2s ease, background .2s ease;
+}
+.chat-pill:hover{ transform:translateY(-2px); box-shadow:0 6px 18px rgba(0,0,0,0.22); background:#fff; }
+.chat-pill:active{ transform:scale(0.96); }
+.chat-pill.pill-bounce{ animation:pillBounce .45s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+@keyframes pillBounce{
+  0%, 100%{ transform:scale(1); }
+  50%{ transform:scale(1.12) translateY(-4px); box-shadow:0 8px 24px rgba(239,68,68,0.4); }
+}
+.chat-pill-dot{ width:8px; height:8px; border-radius:50%; background:#22c55e; box-shadow:0 0 0 0 rgba(34,197,94,.6); animation:chatDot 2s ease-out infinite; }
+@keyframes chatDot{ 0%,100%{ box-shadow:0 0 0 0 rgba(34,197,94,.55);} 50%{ box-shadow:0 0 0 6px rgba(34,197,94,0);} }
+.chat-unread-badge{
+  display:none;
+  background:#ef4444; color:#fff;
+  font-size:10px; font-weight:700;
+  padding:1px 6px; border-radius:10px;
+  margin-left:2px; box-shadow:0 0 8px rgba(239,68,68,0.7);
+  animation:badgePop .2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.chat-unread-badge.active{
+  display:inline-flex; align-items:center; justify-content:center;
+}
+@keyframes badgePop{ from{ transform:scale(0); } to{ transform:scale(1); } }
+@media (max-width:768px), (orientation:portrait){
+  .chat-pill{
+    left:12px; bottom:calc(60px + env(safe-area-inset-bottom));
+    font-size:11.5px; padding:7px 12px;
+  }
+}
+
+.chat-card{ display:flex; flex-direction:column; max-height:78vh; }
+.chat-feed{
+  flex:1 1 auto; overflow-y:auto; min-height:200px; max-height:52vh;
+  display:flex; flex-direction:column; gap:6px; padding:6px 6px 10px; margin-top:6px;
+  scrollbar-width:thin; scrollbar-color:rgba(245,158,11,0.4) rgba(0,0,0,0.15);
+}
+.chat-feed::-webkit-scrollbar{ width:6px; }
+.chat-feed::-webkit-scrollbar-track{ background:rgba(0,0,0,0.15); border-radius:3px; }
+.chat-feed::-webkit-scrollbar-thumb{ background:rgba(245,158,11,0.35); border-radius:3px; }
+.chat-feed::-webkit-scrollbar-thumb:hover{ background:rgba(245,158,11,0.6); }
+
+.chat-line{
+  padding:7px 11px; border-radius:10px;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.06);
+  animation:chatIn .18s ease; display:flex; flex-direction:column; gap:2px;
+}
+@keyframes chatIn{ from{ opacity:0; transform:translateY(-4px);} to{ opacity:1; transform:none;} }
+.chat-line-header{
+  display:flex; justify-content:space-between; align-items:center; width:100%;
+}
+.chat-handle{ font-weight:700; font-size:11.5px; letter-spacing:.5px; text-transform:uppercase; }
+.chat-handle.tendie{ color:#d97706; }
+.chat-handle.dimmie{ color:#dc2626; }
+.chat-time{ font-size:9.5px; color:rgba(255,255,255,0.38); font-family:"Space Mono",monospace; }
+.chat-text{ font-size:12.5px; line-height:1.42; color:rgba(255,255,255,0.92); word-break:break-word; }
+.chat-empty{ color:var(--mut,#b99b6e); text-align:center; font-size:12px; padding:24px 0; opacity:.7; }
+.chat-input-row{ display:flex; gap:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08); }
+.chat-input-row input{
+  flex:1; padding:11px 13px; border-radius:12px; border:1.5px solid rgba(0,0,0,0.15);
+  font:inherit; font-size:13.5px; background:rgba(255,255,255,0.7); color:#1e1208; outline:none;
+}
+.chat-input-row input:focus{ border-color:#f59e0b; }
+.chat-input-row button{
+  flex:0 0 auto; width:46px; border:none; border-radius:12px; cursor:pointer;
+  background:linear-gradient(160deg,#fbbf24,#f59e0b); color:#1a1206; font-size:18px; font-weight:700;
+}
+.chat-input-row button:active{ transform:scale(0.94); }
+.chat-note{ text-align:center; font-size:11px; color:var(--mut,#b99b6e); margin-top:8px; opacity:.75; }
 
 /* ---- Nations Leaderboard & Menu Modals ---- */
 .nations-clickable{
@@ -401,7 +483,12 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
 .modal-list{
   padding:12px 18px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px;
   max-height:55vh;
+  scrollbar-width:thin; scrollbar-color:rgba(245,158,11,0.4) rgba(0,0,0,0.15);
 }
+.modal-list::-webkit-scrollbar{ width:6px; }
+.modal-list::-webkit-scrollbar-track{ background:rgba(0,0,0,0.15); border-radius:3px; }
+.modal-list::-webkit-scrollbar-thumb{ background:rgba(245,158,11,0.35); border-radius:3px; }
+.modal-list::-webkit-scrollbar-thumb:hover{ background:rgba(245,158,11,0.6); }
 .nation-row{
   display:flex; align-items:center; justify-content:space-between;
   padding:9px 14px; border-radius:10px;
@@ -618,6 +705,11 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
           <div class="stat-card-sub">Next reset: Monday 00:00 UTC</div>
         </div>
 
+        <button class="menu-action-btn" id="remindBtn" hidden>
+          <span id="remindBtnText">🔔 Ping me if my side's losing</span>
+          <span>→</span>
+        </button>
+
         <div class="menu-stat-card">
           <div class="stat-card-title">🏆 WEEKS WON SCOREBOARD</div>
           <div class="stat-score-row">
@@ -643,6 +735,30 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
       <div class="modal-footer">
         made by <a href="https://ephix.net" target="_blank" rel="noopener" style="color:#f59e0b; text-decoration:none;">ephix pulse</a>
       </div>
+    </div>
+  </div>
+
+  <!-- War Room chat pill -->
+  <button class="chat-pill" id="chatPill" aria-label="Open War Room chat">
+    <span class="chat-pill-dot"></span>
+    <span>💬 War Room</span>
+    <span class="chat-unread-badge" id="chatUnreadBadge">0</span>
+  </button>
+
+  <!-- War Room chat modal -->
+  <div class="modal-backdrop" id="chatModal">
+    <div class="modal-card chat-card">
+      <div class="modal-header">
+        <div class="modal-title"><span>💬</span><span>WAR ROOM</span></div>
+        <button class="modal-close" id="closeChatBtn" aria-label="Close">✕</button>
+      </div>
+      <div class="chat-feed" id="chatFeed"></div>
+      <div class="chat-input-row">
+        <input id="chatInput" type="text" maxlength="140" autocomplete="off"
+               placeholder="Talk trash about the food…" />
+        <button id="chatSend" aria-label="Send">➤</button>
+      </div>
+      <div class="chat-note">Anonymous · tagged by city · keep it about the snacks 🍗🥟</div>
     </div>
   </div>
 
@@ -680,8 +796,8 @@ const BOWL_ID = { tendie:'bowl', dimmie:'Vinegar_Bowl' };
 const SPIN = { tendie:['tendie'], dimmie:['Chop_Stick_Front','Chop_Stick_Back'] };
 const SPIN_ORIGIN = { tendie:'center top', dimmie:'center' };
 const SAUCE = {
-  tendie: { drop:'#fffdf2', stain:'rgba(226,214,180,ALPHA)' },
-  dimmie: { drop:'#3c2718', stain:'rgba(40,22,14,ALPHA)' },
+  tendie: { drop:'#fffdf2', stain:'rgba(245,238,215,ALPHA)' },
+  dimmie: { drop:'#261208', stain:'rgba(25,10,4,ALPHA)' },
 };
 
 // Face expression IDs
@@ -859,6 +975,64 @@ const canvas = document.getElementById('splash');
 const ctx = canvas.getContext('2d');
 let drops = [], stains = [], persistentStains = [];
 
+// Load persistent battle scars from localStorage
+try {
+  const savedScars = localStorage.getItem('diplomacy_battle_scars');
+  if(savedScars) {
+    persistentStains = JSON.parse(savedScars) || [];
+  }
+} catch(e){}
+
+let saveScarsTimer = null;
+function saveScarsDebounced(){
+  if(saveScarsTimer) return;
+  saveScarsTimer = setTimeout(() => {
+    saveScarsTimer = null;
+    try { localStorage.setItem('diplomacy_battle_scars', JSON.stringify(persistentStains)); } catch(e){}
+  }, 800);
+}
+
+function addStainsForSide(side, count){
+  const rig = rigs[side];
+  const bw = rig?.bowlRect?.w || 140;
+  for(let i=0; i<count; i++){
+    const ang = Math.random() * Math.PI * 2;
+    const dist = (bw * 0.25) + Math.random() * (bw * 0.52);
+    const ox = Math.cos(ang) * dist;
+    const oy = bw * 0.12 + Math.abs(Math.sin(ang)) * 28 + (Math.random() * 20);
+    persistentStains.push({
+      ox, oy,
+      r: 3.5 + Math.random() * 6.5,
+      peak: side === 'tendie' ? (0.36 + Math.random() * 0.22) : (0.45 + Math.random() * 0.28),
+      color: SAUCE[side].stain,
+      side
+    });
+  }
+  saveScarsDebounced();
+}
+
+function syncBattleScarsToScore(tendieDips, dimmieDips){
+  const targetTendie = Math.min(80, Math.max(16, Math.floor(Math.sqrt(tendieDips || 100) * 0.85)));
+  const targetDimmie = Math.min(80, Math.max(16, Math.floor(Math.sqrt(dimmieDips || 100) * 0.85)));
+  
+  const currentTendie = persistentStains.filter(s => s.side === 'tendie').length;
+  const currentDimmie = persistentStains.filter(s => s.side === 'dimmie').length;
+
+  if(currentTendie < targetTendie && rigs.tendie?.bowlRect){
+    addStainsForSide('tendie', targetTendie - currentTendie);
+  }
+  if(currentDimmie < targetDimmie && rigs.dimmie?.bowlRect){
+    addStainsForSide('dimmie', targetDimmie - currentDimmie);
+  }
+}
+
+function seedBattleScars(){
+  if(persistentStains.length < 24){
+    addStainsForSide('tendie', 14);
+    addStainsForSide('dimmie', 14);
+  }
+}
+
 function resizeCanvas(){
   const a = document.querySelector('.arena');
   canvas.width = a.clientWidth; canvas.height = a.clientHeight;
@@ -1024,10 +1198,15 @@ function tick(){
   // 1. Persistent dried sauce stains (battle scars)
   for(let i=0; i<persistentStains.length; i++){
     const ps = persistentStains[i];
-    ctx.save(); ctx.translate(ps.x, ps.y); ctx.scale(1, 0.4);
+    const rig = rigs[ps.side];
+    const bx = rig?.bowlRect ? rig.bowlRect.x : (canvas.width * (ps.side === 'tendie' ? 0.25 : 0.75));
+    const by = rig?.bowlRect ? rig.bowlRect.y : (canvas.height * 0.7);
+    const sx = (ps.ox !== undefined) ? (bx + ps.ox) : (ps.x || bx);
+    const sy = (ps.oy !== undefined) ? (by + ps.oy) : (ps.y || by);
+    ctx.save(); ctx.translate(sx, sy); ctx.scale(1, 0.42);
     const g = ctx.createRadialGradient(0,0,0,0,0,ps.r);
     g.addColorStop(0, ps.color.replace('ALPHA', ps.peak.toFixed(3)));
-    g.addColorStop(0.7, ps.color.replace('ALPHA', (ps.peak * 0.5).toFixed(3)));
+    g.addColorStop(0.65, ps.color.replace('ALPHA', (ps.peak * 0.75).toFixed(3)));
     g.addColorStop(1, ps.color.replace('ALPHA', '0'));
     ctx.fillStyle = g; ctx.beginPath(); ctx.arc(0,0,ps.r,0,Math.PI*2); ctx.fill();
     ctx.restore();
@@ -1057,15 +1236,19 @@ function tick(){
       stains.push({x:d.x,y:d.tableY,r:d.r*1.6+Math.random()*4,born:now,color:SAUCE[d.side].stain,side:d.side});
       
       // Chance to leave a permanent dried battle scar on the table
-      if(Math.random() < 0.22){
-        if(persistentStains.length >= 50) persistentStains.shift();
+      if(Math.random() < 0.45){
+        const rig = rigs[d.side];
+        const ox = rig?.bowlRect ? (d.x - rig.bowlRect.x) : 0;
+        const oy = rig?.bowlRect ? (d.tableY - rig.bowlRect.y) : 0;
+        if(persistentStains.length >= 70) persistentStains.shift();
         persistentStains.push({
-          x: d.x, y: d.tableY,
-          r: d.r * 1.5 + Math.random() * 3,
-          peak: 0.22 + Math.random() * 0.16,
+          ox, oy,
+          r: d.r * 1.5 + Math.random() * 4,
+          peak: d.side === 'tendie' ? (0.36 + Math.random() * 0.22) : (0.45 + Math.random() * 0.28),
           color: SAUCE[d.side].stain,
           side: d.side
         });
+        saveScarsDebounced();
       }
       drops.splice(i,1); continue;
     }
@@ -1145,6 +1328,7 @@ window.addEventListener('resize', () => {
 setupRig('tendie');
 addTendieDrool();
 setupRig('dimmie');
+seedBattleScars();
 tick();
 
 function handleUserDip(side){
@@ -1253,7 +1437,11 @@ const menuNationsBtn = document.getElementById('menuNationsBtn');
 
 function openMenuModal() {
   updateDossierUI();
+  refreshRemindBtn();
   menuModal.classList.add('open');
+  // Stop the attention pulse once they've found the menu.
+  menuBtn.classList.remove('pulsing');
+  try { localStorage.setItem('diplomacy_menu_seen', '1'); } catch(e){}
 }
 function closeMenuModal() {
   menuModal.classList.remove('open');
@@ -1273,6 +1461,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (modalEl.classList.contains('open')) closeNationsModal();
     if (menuModal.classList.contains('open')) closeMenuModal();
+    if (chatModal.classList.contains('open')) closeChat();
   }
 });
 
@@ -1467,7 +1656,191 @@ function updateScoreUI(d){
   document.getElementById('wwDimmie').textContent = d.weeks_won_dimmie||0;
   document.getElementById('menuWwTendie').textContent = d.weeks_won_tendie||0;
   document.getElementById('menuWwDimmie').textContent = d.weeks_won_dimmie||0;
+
+  // Dynamically grow battle scars as all-time scores climb
+  syncBattleScarsToScore(d.tendie_dips, d.dimmie_dips);
 }
+
+// ---- Weekly reminder push (opt-in airlock, lives in the HQ menu) ----
+const VAPID_PUBLIC_KEY = 'BD0gLOQ8fNtLkTwMp3YWmi7yKQAruePiNMToPWK6A6b6g--AQPmoa26NRqgv--82dNzDqGAWx6bb_peSvuRoSb0';
+const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+let swReg = null;
+const remindBtn = document.getElementById('remindBtn');
+const remindBtnText = document.getElementById('remindBtnText');
+
+function myFavoredSide(){
+  // Whichever side they've dipped more; ties lean Tendie (the underdog rally).
+  return (myDips.dimmie||0) > (myDips.tendie||0) ? 'dimmie' : 'tendie';
+}
+
+function urlB64ToUint8(base64){
+  const pad = '='.repeat((4 - base64.length % 4) % 4);
+  const b64 = (base64 + pad).replace(/-/g,'+').replace(/_/g,'/');
+  const raw = atob(b64);
+  const out = new Uint8Array(raw.length);
+  for(let i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i);
+  return out;
+}
+
+// Reflect current permission/subscription state in the button (called on menu open).
+async function refreshRemindBtn(){
+  if(!pushSupported){ remindBtn.hidden = true; return; }
+  remindBtn.hidden = false;
+  if(Notification.permission === 'denied'){
+    remindBtnText.textContent = '🔕 Reminders blocked in browser';
+    remindBtn.disabled = true;
+    return;
+  }
+  let subbed = false;
+  try{
+    if(swReg){ subbed = !!(await swReg.pushManager.getSubscription()); }
+  }catch(e){}
+  remindBtn.disabled = false;
+  remindBtnText.textContent = subbed
+    ? "✅ You'll get pinged if your side's losing"
+    : "🔔 Ping me if my side's losing";
+}
+
+async function enableReminders(){
+  if(!pushSupported || !swReg) return;
+  remindBtnText.textContent = '…';
+  // The native prompt only fires here, after a deliberate tap (the airlock).
+  const perm = await Notification.requestPermission();
+  if(perm !== 'granted'){ refreshRemindBtn(); return; }
+  try{
+    const sub = await swReg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlB64ToUint8(VAPID_PUBLIC_KEY),
+    });
+    await fetch('/api/subscribe', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ subscription: sub.toJSON(), side: myFavoredSide() }),
+    });
+    remindBtnText.textContent = "✅ You'll get pinged if your side's losing";
+  }catch(e){
+    remindBtnText.textContent = '⚠ Could not enable — try again';
+  }
+}
+
+if(remindBtn){
+  remindBtn.addEventListener('click', () => {
+    if(remindBtn.disabled) return;
+    enableReminders();
+  });
+}
+
+if(pushSupported){
+  navigator.serviceWorker.register('/sw.js').then(reg => { swReg = reg; }).catch(()=>{});
+}
+
+// Pulse the burger button until the menu's been discovered once.
+try{
+  if(!localStorage.getItem('diplomacy_menu_seen')) menuBtn.classList.add('pulsing');
+}catch(e){ menuBtn.classList.add('pulsing'); }
+
+// ---- War Room chat ----
+const chatModal = document.getElementById('chatModal');
+const chatPill = document.getElementById('chatPill');
+const closeChatBtn = document.getElementById('closeChatBtn');
+const chatFeed = document.getElementById('chatFeed');
+const chatInput = document.getElementById('chatInput');
+const chatSend = document.getElementById('chatSend');
+const chatUnreadBadge = document.getElementById('chatUnreadBadge');
+let chatEmpty = true;
+let chatUnreadCount = 0;
+let lastSeenChatTs = 0;
+try {
+  const savedTs = localStorage.getItem('diplomacy_last_seen_chat_ts');
+  if (savedTs) lastSeenChatTs = parseInt(savedTs, 10) || 0;
+} catch(e){}
+
+function scrollChat(){ chatFeed.scrollTop = 0; }
+function openChat(){
+  chatModal.classList.add('open');
+  chatUnreadCount = 0;
+  lastSeenChatTs = Date.now();
+  try { localStorage.setItem('diplomacy_last_seen_chat_ts', String(lastSeenChatTs)); } catch(e){}
+  if(chatUnreadBadge) chatUnreadBadge.classList.remove('active');
+  setTimeout(()=>{ chatInput.focus(); chatFeed.scrollTop = 0; }, 40);
+}
+function closeChat(){ chatModal.classList.remove('open'); }
+chatPill.addEventListener('click', openChat);
+closeChatBtn.addEventListener('click', closeChat);
+chatModal.addEventListener('click', e => { if(e.target===chatModal) closeChat(); });
+
+function showChatEmpty(){
+  chatFeed.textContent = '';
+  const e = document.createElement('div');
+  e.className = 'chat-empty';
+  e.textContent = 'No shots fired yet. Start the trash talk. 🍗🥟';
+  chatFeed.appendChild(e);
+  chatEmpty = true;
+}
+
+function fmtChatTime(ts){
+  if(!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+// Render one comment. textContent everywhere — never innerHTML — so a commenter
+// cannot inject markup into everyone else's feed.
+function renderComment(handle, text, side, ts, isLive = false){
+  if(chatEmpty){ chatFeed.textContent=''; chatEmpty=false; }
+  const line = document.createElement('div');
+  line.className = 'chat-line';
+
+  const header = document.createElement('div');
+  header.className = 'chat-line-header';
+
+  const h = document.createElement('span');
+  h.className = 'chat-handle ' + (side==='dimmie'?'dimmie':'tendie');
+  h.textContent = handle;
+
+  const commentTs = ts || Date.now();
+  const time = document.createElement('span');
+  time.className = 'chat-time';
+  time.textContent = fmtChatTime(commentTs);
+
+  header.append(h, time);
+
+  const t = document.createElement('div');
+  t.className = 'chat-text';
+  t.textContent = text;
+
+  line.append(header, t);
+  chatFeed.prepend(line);
+  while(chatFeed.children.length > 60) chatFeed.removeChild(chatFeed.lastChild);
+
+  // If chat modal is closed:
+  // Live socket messages ALWAYS increment; bulk historical messages check against lastSeenChatTs
+  if(!chatModal.classList.contains('open')){
+    if(isLive || commentTs > lastSeenChatTs){
+      chatUnreadCount++;
+      if(chatUnreadBadge){
+        chatUnreadBadge.textContent = chatUnreadCount > 9 ? '9+' : chatUnreadCount;
+        chatUnreadBadge.classList.add('active');
+      }
+      if(isLive && chatPill){
+        chatPill.classList.remove('pill-bounce');
+        void chatPill.offsetWidth;
+        chatPill.classList.add('pill-bounce');
+      }
+    }
+  }
+}
+
+function sendComment(){
+  const v = chatInput.value.trim();
+  if(!v) return;
+  if(wsReady){ try{ ws.send(JSON.stringify({type:'comment', text:v, side:myFavoredSide()})); }catch(e){} }
+  chatInput.value='';
+  chatInput.focus();
+}
+chatSend.addEventListener('click', sendComment);
+chatInput.addEventListener('keydown', e => { if(e.key==='Enter'){ e.preventDefault(); sendComment(); } });
+showChatEmpty();
 
 let ws, wsReady=false;
 function wsConnect(){
@@ -1481,6 +1854,10 @@ function wsConnect(){
         triggerRemoteDip(d.side, d.country, d.city);
       } else if(d.type==='init'||d.type==='tick') {
         updateScoreUI(d);
+      } else if(d.type==='comment') {
+        renderComment(d.handle, d.text, d.side, d.ts, true);
+      } else if(d.type==='comments') {
+        (d.items||[]).forEach(c => renderComment(c.handle, c.text, c.side, c.ts, false));
       }
     }catch(ex){}
   };

@@ -40,8 +40,21 @@ app.get('/api/ws', (c) => {
   return stub.fetch(req);
 });
 
+app.post('/api/subscribe', async (c) => {
+  const id = c.env.GLOBAL_WAR.idFromName('global-war-v1');
+  const stub = c.env.GLOBAL_WAR.get(id);
+  const res = await stub.fetch(
+    new Request('https://dummy/subscribe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: await c.req.raw.text(),
+    })
+  );
+  return new Response(res.body, { status: res.status, headers: { 'Content-Type': 'application/json' } });
+});
+
 app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', version: '0.4.3' });
+  return c.json({ status: 'ok', version: '0.5.0' });
 });
 
 // Fallback to static assets
@@ -52,4 +65,11 @@ app.all('*', async (c) => {
   return c.text('Not found', 404);
 });
 
-export default app;
+// Cron trigger → ask the DO to fire weekly reminders (it self-gates on window/side).
+async function scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+  const id = env.GLOBAL_WAR.idFromName('global-war-v1');
+  const stub = env.GLOBAL_WAR.get(id);
+  ctx.waitUntil(stub.fetch(new Request('https://dummy/reminders/run', { method: 'POST' })));
+}
+
+export default { fetch: app.fetch, scheduled };

@@ -14,6 +14,16 @@
     "directory": "./dist",
     "binding": "ASSETS"
   },
+  "triggers": {
+    // Hourly; the DO self-gates to the 36h pre-reset window and losing side.
+    "crons": ["0 * * * *"]
+  },
+  "vars": {
+    // VAPID public key is safe to expose. Private key is a secret:
+    //   npx wrangler secret put VAPID_PRIVATE_KEY
+    "VAPID_PUBLIC_KEY": "BD0gLOQ8fNtLkTwMp3YWmi7yKQAruePiNMToPWK6A6b6g--AQPmoa26NRqgv--82dNzDqGAWx6bb_peSvuRoSb0",
+    "VAPID_SUBJECT": "mailto:lewi.hirvela@gmail.com"
+  },
   "durable_objects": {
     "bindings": [
       {

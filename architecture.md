@@ -128,10 +128,10 @@ old "to do" is done). Key paths:
 `build-arena.mjs` reads `arena.html` from the project root and the namespaced SVGs
 from `public/assets/`, strips the XML prolog, substitutes `{{TENDIE_SVG}}` /
 `{{DIMMIE_SVG}}`, and writes `dist/index.html` plus copies of `public/assets/` and
-`favicon.svg`. A duplicate `arena.html` also sits one level up in
-`dip-lomacy.com/assets/` alongside the throwaway `diptuner.html` sauce-tuner
-workbench; the project-root copy is the one that gets built — keep them in sync or
-collapse to one.
+`favicon.svg`. `dip-lomacy/arena.html` is the single canonical front-end source: it
+is what the build reads and deploys. (An earlier prototype copy lived one level up in
+`dip-lomacy.com/assets/`; it was a stale backup and has been deleted, so there is now
+one source of truth with no drift risk.)
 
 ## 6. Art inventory and rig notes
 
@@ -142,9 +142,9 @@ sauce swaps stay trivial. Note the filesystem is case-insensitive, so `xlb.svg` 
 `XLB.svg` are the same file.
 
 - `tendie.svg` (~16KB): has a `#dip` wrapper group meant to be the group that rotates
-  for the dip. Contains `#Hand` (the arm) and `#tendie` (the tender). Currently one
-  full face (`#Face_Happy`), plus alternate brow and mouth parts being added
-  (`mouth1`, `left_eyebrow`, `right_eye_brow1`) to build more expressions by swap.
+  for the dip. Contains `#Hand` (the arm) and `#tendie` (the tender). Now carries all
+  six faces (`#Face_{Happy,Stunned,Angry,Surprised,Begging,Worried}`) — see the "Done"
+  note under Decisions below for how Begging and Worried were ported from Dimmie.
 - `XLB.svg` (~574KB, path-heavy, run through SVGO on import): the dumpling. Chopsticks
   split into `#Chop_Stick_Back` and `#Chop_Stick_Front` so the dumpling nests between
   them with depth. Six toggleable faces: happy, begging, worried, angry, stunned,
@@ -228,8 +228,10 @@ Three tiers, by role:
 
 ### Dip animation (finalised in the sauce tuner)
 
-Built and tuned in a throwaway workbench (`assets/diptuner.html`, served by `serve.mjs`),
-to be deleted once baked into the real app. The rig and both presets are locked.
+Built and tuned in a standalone workbench (`assets/diptuner.html`, served by `serve.mjs`).
+The rig and both presets below are locked and baked into the app; the tuner is **kept**
+(not deleted) as a live slider bench for re-tuning the dip feel or reusing the pattern
+elsewhere. The presets it emits paste straight back into the app.
 
 Rig (shared structure, per mascot):
 
