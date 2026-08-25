@@ -4,7 +4,7 @@ import { moderateComment } from './moderation';
 
 // War-room chat: ephemeral rolling buffer, min gap between a socket's comments.
 const COMMENT_BUFFER_MAX = 30;
-const COMMENT_MIN_INTERVAL_MS = 2000;
+const COMMENT_MIN_INTERVAL_MS = 5000;
 
 interface ChatComment {
   handle: string;
@@ -74,10 +74,10 @@ function hashIp(ip: string): string {
   return (h >>> 0).toString(36).slice(0, 6);
 }
 
-// Rate limiting parameters (generous high-energy clicker profile)
+// Rate limiting parameters (5-second rate limited dipper profile)
 const BUCKET_CAPACITY = 150;
 const TOKEN_REFILL_RATE = 12.0; // tokens per second
-const MIN_DIP_INTERVAL_MS = 60; // allows rapid multi-finger clicking up to 16 clicks/sec
+const MIN_DIP_INTERVAL_MS = 5000; // hard 5-second minimum interval between dips
 const MAX_DIPS_PER_MINUTE = 600; // generous session headroom (up to 10 dips/sec sustained)
 const MAX_CONCURRENT_SOCKETS_PER_IP = 15;
 const HUMAN_COOLDOWN_MS = 5 * 1000; // 5-second short breather if capacity fully exhausted
@@ -359,11 +359,12 @@ export class GlobalWarDO extends DurableObject<Env> {
         const meta = this.metaFor(ws);
         if (!meta) return;
 
+        const count = Math.max(1, Math.min(typeof data.count === 'number' ? Math.floor(data.count) : 1, 100));
         const now = Date.now();
         const interval = meta.lastDipTime > 0 ? now - meta.lastDipTime : 1000;
 
-        // 1. Hard Physical Animation Gate (drop clicks faster than 380ms)
-        if (interval < MIN_DIP_INTERVAL_MS) {
+        // 1. Hard Physical Animation Gate (drop single clicks faster than MIN_DIP_INTERVAL_MS)
+        if (count === 1 && interval < MIN_DIP_INTERVAL_MS) {
           return;
         }
 
@@ -397,21 +398,23 @@ export class GlobalWarDO extends DurableObject<Env> {
           // Prune timestamps older than 60s
           ipState.recentDips = ipState.recentDips.filter(t => now - t < 60000);
 
-          // If out of tokens or exceeding 250 dips/min, trigger human 15s cooldown
-          if (ipState.tokens < 1 || ipState.recentDips.length >= MAX_DIPS_PER_MINUTE) {
+          // If out of tokens or exceeding MAX_DIPS_PER_MINUTE, trigger human cooldown
+          if (ipState.tokens < count || ipState.recentDips.length + count > MAX_DIPS_PER_MINUTE) {
             ipState.cooldownUntil = now + HUMAN_COOLDOWN_MS;
             return;
           }
 
-          ipState.tokens -= 1;
-          ipState.recentDips.push(now);
+          ipState.tokens -= count;
+          for (let i = 0; i < count; i++) {
+            ipState.recentDips.push(now);
+          }
         }
 
         // 5. Continuous Streak Tracking
         if (interval < 1000) {
-          meta.continuousDips += 1;
+          meta.continuousDips += count;
         } else {
-          meta.continuousDips = 0;
+          meta.continuousDips = count;
         }
 
         // Over 350 rapid continuous clicks without taking a breath -> 5s breather
@@ -421,23 +424,25 @@ export class GlobalWarDO extends DurableObject<Env> {
           return;
         }
 
-        // 6. Robotic Autoclicker Jitter Analysis (Hard Bot Kill)
-        meta.dipIntervals.push(interval);
-        if (meta.dipIntervals.length > 15) {
-          meta.dipIntervals.shift();
-        }
+        // 6. Robotic Autoclicker Jitter Analysis (Hard Bot Kill) - only for unbatched single clicks
+        if (count === 1) {
+          meta.dipIntervals.push(interval);
+          if (meta.dipIntervals.length > 15) {
+            meta.dipIntervals.shift();
+          }
 
-        if (meta.dipIntervals.length >= 14) {
-          const mean = meta.dipIntervals.reduce((a, b) => a + b, 0) / meta.dipIntervals.length;
-          const variance =
-            meta.dipIntervals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
-            meta.dipIntervals.length;
-          const stdDev = Math.sqrt(variance);
+          if (meta.dipIntervals.length >= 14) {
+            const mean = meta.dipIntervals.reduce((a, b) => a + b, 0) / meta.dipIntervals.length;
+            const variance =
+              meta.dipIntervals.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) /
+              meta.dipIntervals.length;
+            const stdDev = Math.sqrt(variance);
 
-          // Robotic scripts with zero interval jitter (stdDev < 6ms) are blocked
-          if (stdDev < 6) {
-            if (ipState) ipState.permanentBot = true;
-            return;
+            // Robotic scripts with zero interval jitter (stdDev < 6ms) are blocked
+            if (stdDev < 6) {
+              if (ipState) ipState.permanentBot = true;
+              return;
+            }
           }
         }
 
@@ -448,26 +453,25 @@ export class GlobalWarDO extends DurableObject<Env> {
 
         // Commit dip to both all-time and weekly totals
         if (data.side === 'tendie') {
-          this.tendieDips += 1;
-          this.weeklyTendie += 1;
+          this.tendieDips += count;
+          this.weeklyTendie += count;
         } else {
-          this.dimmieDips += 1;
-          this.weeklyDimmie += 1;
+          this.dimmieDips += count;
+          this.weeklyDimmie += count;
         }
 
         if (meta.country && meta.country !== 'XX') {
-          this.countryDips[meta.country] = (this.countryDips[meta.country] || 0) + 1;
+          this.countryDips[meta.country] = (this.countryDips[meta.country] || 0) + count;
         }
 
         // DEBUG: per-dip trace for `wrangler tail` — source is a hashed IP (no PII).
-        // Grep the tail for "CH" to see whether Zurich is one hash or many. Remove
-        // once the bot-vs-players question is answered.
-        console.log(`DIP ${data.side} ${meta.country} ${hashIp(meta.ip)}`);
+        console.log(`DIP ${data.side} count=${count} ${meta.country} ${hashIp(meta.ip)}`);
 
         // Broadcast instantaneous live dip event to all other active clients
         const worldDipPayload = JSON.stringify({
           type: 'world_dip',
           side: data.side,
+          count: count,
           country: meta.country,
           city: meta.city,
         });

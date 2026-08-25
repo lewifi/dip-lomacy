@@ -1331,7 +1331,16 @@ setupRig('dimmie');
 seedBattleScars();
 tick();
 
+let lastUserDipTime = 0;
 function handleUserDip(side){
+  const now = Date.now();
+  const elapsed = now - lastUserDipTime;
+  if(elapsed < 5000){
+    const remaining = Math.ceil((5000 - elapsed) / 1000);
+    showToast(`⏳ Slow down! Wait ${remaining}s before dipping.`);
+    return;
+  }
+  lastUserDipTime = now;
   spawnDipBubble(side, '', '', true);
   triggerDip(side, false);
   recordUserDip(side);
@@ -1831,10 +1840,23 @@ function renderComment(handle, text, side, ts, isLive = false){
   }
 }
 
+let lastSentCommentTs = 0;
 function sendComment(){
   const v = chatInput.value.trim();
   if(!v) return;
-  if(wsReady){ try{ ws.send(JSON.stringify({type:'comment', text:v, side:myFavoredSide()})); }catch(e){} }
+  const now = Date.now();
+  const elapsed = now - lastSentCommentTs;
+  if(elapsed < 5000){
+    const remaining = Math.ceil((5000 - elapsed) / 1000);
+    showToast(`⏳ Slow down! Wait ${remaining}s before sending.`);
+    return;
+  }
+  if(wsReady){
+    try{
+      ws.send(JSON.stringify({type:'comment', text:v, side:myFavoredSide()}));
+      lastSentCommentTs = now;
+    }catch(e){}
+  }
   chatInput.value='';
   chatInput.focus();
 }
@@ -1865,7 +1887,7 @@ function wsConnect(){
   ws.onerror = () => { ws.close(); };
 }
 function wsSend(side){
-  if(wsReady) try{ ws.send(JSON.stringify({type:'dip',side})); }catch(e){}
+  if(wsReady) try{ ws.send(JSON.stringify({type:'dip', side})); }catch(e){}
 }
 wsConnect();
 </script>
