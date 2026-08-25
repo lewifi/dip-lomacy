@@ -158,9 +158,11 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   position:absolute; inset:0; z-index:4; pointer-events:none;
   display:flex; align-items:center; justify-content:center;
 }
-.ringmaster > svg{ width:min(72vh, 600px, 46vw); height:auto; display:block; overflow:visible; }
-/* Jump pivots from Cheesey's own feet, wherever he sits on the canvas */
-.ringmaster .cheese-rotor{ transform-box:fill-box; transform-origin:50% 100%; }
+.ringmaster > svg{ width:min(72vh, 600px, 46vw); height:auto; display:block; overflow:visible; transform:translateY(16%); }
+/* Jump pivots from Cheesey's own feet, wherever he sits on the canvas.
+   pointer-events:auto so a tap on his body is caught here (SVG hit-tests only
+   painted pixels) instead of falling through to the Tendie stage behind him. */
+.ringmaster .cheese-rotor{ transform-box:fill-box; transform-origin:50% 100%; pointer-events:auto; cursor:pointer; }
 @keyframes cheeseHop{
   0%   { transform:translateY(0)    scaleX(1)    scaleY(1); }
   25%  { transform:translateY(0)    scaleX(1.07) scaleY(0.90); }  /* fat squash */
@@ -169,6 +171,9 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   100% { transform:translateY(0)    scaleX(1)    scaleY(1); }
 }
 .ringmaster.jumping .cheese-rotor{ animation:cheeseHop .4s ease-out; }
+@media (max-width:768px), (orientation:portrait){
+  .ringmaster > svg{ width:min(50vh, 380px, 90vw); }
+}
 
 /* ---- Pull to refresh indicator ---- */
 .pull-refresh-indicator{
@@ -303,8 +308,10 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
     letter-spacing: 2px;
     padding: 3px 12px;
   }
+  /* Push labels to the outer edges so the centre stays clear for Cheesey */
   #stageTendie .faction-label {
-    bottom: 2px;
+    top: 44px;
+    bottom: auto;
   }
   #stageDimmie .faction-label {
     bottom: 2px;
@@ -1137,6 +1144,19 @@ function ringmasterJump(){
   ringmasterEl.classList.add('jumping');
   ringmasterEl.addEventListener('animationend', () => ringmasterEl.classList.remove('jumping'), { once:true });
 }
+// Tapping Cheesey himself just makes him hop — never a dip — and the hop is
+// broadcast so everyone's Cheesey hops too. Throttled so it can't be spammed.
+let cheeseSendLast = 0;
+if(ringmasterEl){
+  ringmasterEl.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ringmasterJump();
+    const now = performance.now();
+    if(now - cheeseSendLast < 250) return;
+    cheeseSendLast = now;
+    if(wsReady){ try{ ws.send(JSON.stringify({type:'cheese'})); }catch(e){} }
+  });
+}
 
 function triggerDip(side, isRemote = false){
   const rig = rigs[side];
@@ -1358,8 +1378,8 @@ let lastUserDipTime = 0;
 function handleUserDip(side){
   const now = Date.now();
   const elapsed = now - lastUserDipTime;
-  if(elapsed < 2000){
-    const remaining = Math.ceil((2000 - elapsed) / 1000);
+  if(elapsed < 1000){
+    const remaining = Math.ceil((1000 - elapsed) / 1000);
     showToast(`⏳ Slow down! Wait ${remaining}s before dipping.`);
     return;
   }
@@ -1903,6 +1923,8 @@ function wsConnect(){
         renderComment(d.handle, d.text, d.side, d.ts, true);
       } else if(d.type==='comments') {
         (d.items||[]).forEach(c => renderComment(c.handle, c.text, c.side, c.ts, false));
+      } else if(d.type==='world_cheese') {
+        ringmasterJump();
       }
     }catch(ex){}
   };

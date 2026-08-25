@@ -38,6 +38,7 @@ interface SocketMetadata {
   dipIntervals: number[];
   continuousDips: number;
   lastCommentTime: number;
+  lastCheeseTime?: number;
 }
 
 interface IpRateState {
@@ -76,10 +77,10 @@ function hashIp(ip: string): string {
   return (h >>> 0).toString(36).slice(0, 6);
 }
 
-// Rate limiting parameters (2-second rate limited dipper profile)
+// Rate limiting parameters (1-second rate limited dipper profile)
 const BUCKET_CAPACITY = 150;
 const TOKEN_REFILL_RATE = 12.0; // tokens per second
-const MIN_DIP_INTERVAL_MS = 1800; // hard 1.8-second server-side minimum interval between dips (200ms latency buffer)
+const MIN_DIP_INTERVAL_MS = 800; // hard 0.8-second server-side minimum interval between dips (200ms latency buffer)
 const MAX_DIPS_PER_MINUTE = 600; // generous session headroom (up to 10 dips/sec sustained)
 const MAX_CONCURRENT_SOCKETS_PER_IP = 15;
 const HUMAN_COOLDOWN_MS = 5 * 1000; // 5-second short breather if capacity fully exhausted
@@ -328,6 +329,26 @@ export class GlobalWarDO extends DurableObject<Env> {
     }
   }
 
+  // A direct tap on Cheesey the Ringmaster: hop him on every other tab too.
+  // Purely cosmetic (no score), lightly rate-limited so it can't be flooded.
+  private handleCheeseTap(ws: WebSocket) {
+    const meta = this.metaFor(ws);
+    if (!meta) return;
+    const now = Date.now();
+    if (now - (meta.lastCheeseTime ?? 0) < 250) return;
+    meta.lastCheeseTime = now;
+    const payload = JSON.stringify({ type: 'world_cheese' });
+    for (const socket of this.ctx.getWebSockets()) {
+      if (socket !== ws) {
+        try {
+          socket.send(payload);
+        } catch {
+          // ignore stale socket
+        }
+      }
+    }
+  }
+
   // Rebuild per-socket metadata from the hibernation attachment when the
   // in-memory map was wiped (DO woke from hibernation). Without this, a woken
   // DO would drop every dip from a still-open socket it no longer "remembers".
@@ -375,6 +396,11 @@ export class GlobalWarDO extends DurableObject<Env> {
 
       if (data.type === 'comment') {
         await this.handleComment(ws, data.text, data.side);
+        return;
+      }
+
+      if (data.type === 'cheese') {
+        this.handleCheeseTap(ws);
         return;
       }
 
