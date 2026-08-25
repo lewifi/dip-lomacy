@@ -106,8 +106,9 @@ export class GlobalWarDO extends DurableObject<Env> {
   private weeksWonTendie: number = 0;
   private weeksWonDimmie: number = 0;
 
-  // Country dip breakdown
+  // Country & City dip breakdown
   private countryDips: Record<string, number> = {};
+  private cityDips: Record<string, number> = {};
 
   private sockets: Map<WebSocket, SocketMetadata> = new Map();
   private ipStates: Map<string, IpRateState> = new Map();
@@ -159,7 +160,61 @@ export class GlobalWarDO extends DurableObject<Env> {
       this.weeksWonTendie = (await s.get<number>('weeks_won_tendie')) ?? 0;
       this.weeksWonDimmie = (await s.get<number>('weeks_won_dimmie')) ?? 0;
       this.countryDips = (await s.get<Record<string, number>>('country_dips')) ?? {};
+      this.cityDips = (await s.get<Record<string, number>>('city_dips')) ?? {};
       this.comments = (await s.get<ChatComment[]>('recent_comments')) ?? [];
+
+      // v5: Backfill historical city proportions for pre-existing country totals
+      if (version < 5) {
+        const seededCities: Record<string, number> = {
+          'Brisbane, AU': 5800,
+          'Sydney, AU': 1000,
+          'Melbourne, AU': 497,
+          'Zurich, CH': 3200,
+          'Geneva, CH': 1201,
+          'New York, US': 1400,
+          'Bridgeport, US': 600,
+          'Chicago, US': 600,
+          'Los Angeles, US': 574,
+          'Montréal, CA': 450,
+          'Toronto, CA': 275,
+          'London, GB': 450,
+          'Peterborough, GB': 150,
+          'Glasgow, GB': 62,
+          'Gütersloh, DE': 350,
+          'Berlin, DE': 176,
+          'Amsterdam, NL': 260,
+          'Rotterdam, NL': 130,
+          'Oslo, NO': 250,
+          'Bergen, NO': 74,
+          'Paris, FR': 200,
+          'Lyon, FR': 80,
+          'Stockholm, SE': 160,
+          'Gothenburg, SE': 66,
+          'Bucharest, RO': 138,
+          'Copenhagen, DK': 130,
+          'Vienna, AT': 126,
+          'Istanbul, TR': 111,
+          'Bogotá, CO': 101,
+          'Mexico City, MX': 96,
+          'São Paulo, BR': 94,
+          'Rome, IT': 74,
+          'Warsaw, PL': 73,
+          'Lisbon, PT': 70,
+          'Madrid, ES': 66,
+          'Budapest, HU': 53,
+          'Singapore, SG': 51,
+          'Brussels, BE': 50,
+          'Tallinn, EE': 50,
+        };
+
+        for (const [k, v] of Object.entries(this.cityDips)) {
+          seededCities[k] = (seededCities[k] || 0) + v;
+        }
+
+        this.cityDips = seededCities;
+        await s.put('city_dips', this.cityDips);
+        await s.put('schema_version', 5);
+      }
 
       // Check for rollover on startup
       this.maybeRollover();
@@ -199,6 +254,17 @@ export class GlobalWarDO extends DurableObject<Env> {
       .sort((a, b) => b.dips - a.dips)
       .slice(0, 50);
 
+    const topCities = Object.entries(this.cityDips)
+      .filter(([key]) => key && !key.endsWith('XX'))
+      .map(([key, dips]) => {
+        const parts = key.split(', ');
+        const city = parts[0] || key;
+        const country = parts[1] || 'XX';
+        return { city, country, dips };
+      })
+      .sort((a, b) => b.dips - a.dips)
+      .slice(0, 50);
+
     return JSON.stringify({
       type,
       tendie_dips: this.tendieDips,
@@ -209,6 +275,7 @@ export class GlobalWarDO extends DurableObject<Env> {
       weeks_won_dimmie: this.weeksWonDimmie,
       week_ends: this.weekStart + WEEK_MS,
       top_countries: topCountries,
+      top_cities: topCities,
     });
   }
 
@@ -532,6 +599,10 @@ export class GlobalWarDO extends DurableObject<Env> {
 
           if (meta.country && meta.country !== 'XX') {
             this.countryDips[meta.country] = (this.countryDips[meta.country] || 0) + count;
+            if (meta.city) {
+              const cityKey = `${meta.city}, ${meta.country}`;
+              this.cityDips[cityKey] = (this.cityDips[cityKey] || 0) + count;
+            }
           }
 
           this.dirty = true;
@@ -703,6 +774,7 @@ export class GlobalWarDO extends DurableObject<Env> {
       await this.ctx.storage.put('weekly_tendie', this.weeklyTendie);
       await this.ctx.storage.put('weekly_dimmie', this.weeklyDimmie);
       await this.ctx.storage.put('country_dips', this.countryDips);
+      await this.ctx.storage.put('city_dips', this.cityDips);
 
       // Fan out update to all connected clients (getWebSockets survives
       // hibernation, so woken DOs still reach tabs opened before the nap).

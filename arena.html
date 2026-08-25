@@ -498,6 +498,17 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   transition:background .2s ease;
 }
 .modal-close:hover{ background:rgba(255,255,255,0.25); }
+.leaderboard-tabs{
+  display:flex; gap:8px; padding:10px 18px 6px; border-bottom:1px solid rgba(255,255,255,0.08); background:rgba(0,0,0,0.18);
+}
+.l-tab{
+  flex:1; padding:8px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.6);
+  font-family:"Space Mono",monospace; font-size:11px; font-weight:700; cursor:pointer;
+  transition:all .15s ease;
+}
+.l-tab:hover{ background:rgba(255,255,255,0.08); color:#fff; }
+.l-tab.active{ background:#f59e0b; color:#1a1005; border-color:#f59e0b; }
 .modal-list{
   padding:12px 18px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px;
   max-height:55vh;
@@ -667,21 +678,25 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
     <span class="reset-wrap">Resets in: <span class="num" id="resetCountdown">—</span></span>
   </div>
 
-  <!-- Nations Modal Popup -->
+  <!-- Nations & Cities Modal Popup -->
   <div class="modal-backdrop" id="nationsModal">
     <div class="modal-card">
       <div class="modal-header">
         <div class="modal-title">
           <span>🌍</span>
-          <span>GLOBAL DIPPING NATIONS</span>
+          <span>GLOBAL LEADERBOARD</span>
         </div>
         <button class="modal-close" id="closeNationsModal" aria-label="Close">✕</button>
+      </div>
+      <div class="leaderboard-tabs">
+        <button class="l-tab active" id="tabNationsBtn">NATIONS 🌍</button>
+        <button class="l-tab" id="tabCitiesBtn">CITIES 🏙️</button>
       </div>
       <div class="modal-list" id="nationsList">
         <!-- Dynamically rendered rows -->
       </div>
       <div class="modal-footer">
-        Active Nations: <span class="num" id="modalNationCount">0</span> · Total Dips: <span class="num" id="modalTotalDips">0</span>
+        <span id="modalListLabel">Active Nations</span>: <span class="num" id="modalNationCount">0</span> · Total Dips: <span class="num" id="modalTotalDips">0</span>
       </div>
     </div>
   </div>
@@ -1418,9 +1433,59 @@ function getCountryName(code) {
 }
 
 let latestTopCountries = [];
+let latestTopCities = [];
+let activeLeaderboardTab = 'nations';
+
 function renderNationsModal() {
   const list = document.getElementById('nationsList');
   list.innerHTML = '';
+
+  if (activeLeaderboardTab === 'cities') {
+    document.getElementById('modalListLabel').textContent = 'Active Cities';
+    if (!latestTopCities || latestTopCities.length === 0) {
+      list.innerHTML = '<div style="text-align:center; padding:32px 10px; color:rgba(255,255,255,0.4);">No city dips recorded yet. Be the first to dip!</div>';
+      document.getElementById('modalNationCount').textContent = '0';
+      document.getElementById('modalTotalDips').textContent = '0';
+      return;
+    }
+
+    const totalDips = latestTopCities.reduce((sum, c) => sum + c.dips, 0);
+    const maxDips = latestTopCities[0]?.dips || 1;
+
+    document.getElementById('modalNationCount').textContent = latestTopCities.length;
+    document.getElementById('modalTotalDips').textContent = fmtNum(totalDips);
+
+    latestTopCities.forEach((c, idx) => {
+      const rank = idx + 1;
+      const rankBadge = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : (rank === 3 ? '🥉' : `#${rank}`));
+      const rankClass = rank <= 3 ? `rank-${rank}` : '';
+      const flag = countryFlag(c.country);
+      const name = `${c.city}, ${c.country}`;
+      const pct = totalDips > 0 ? Math.round((c.dips / totalDips) * 100) : 0;
+      const barWidth = Math.max(4, Math.round((c.dips / maxDips) * 100));
+
+      const row = document.createElement('div');
+      row.className = 'nation-row';
+      row.innerHTML = `
+        <div class="nation-left">
+          <span class="nation-rank ${rankClass}">${rankBadge}</span>
+          <span class="nation-flag">${flag}</span>
+          <span class="nation-name">${name}</span>
+        </div>
+        <div class="nation-right">
+          <span class="nation-dips">${fmtNum(c.dips)} (${pct}%)</span>
+          <div class="nation-pct-bar">
+            <div class="nation-pct-fill" style="width: ${barWidth}%"></div>
+          </div>
+        </div>
+      `;
+      list.appendChild(row);
+    });
+    return;
+  }
+
+  // Nations view
+  document.getElementById('modalListLabel').textContent = 'Active Nations';
   if (!latestTopCountries || latestTopCountries.length === 0) {
     list.innerHTML = '<div style="text-align:center; padding:32px 10px; color:rgba(255,255,255,0.4);">No country dips recorded yet. Be the first to dip!</div>';
     document.getElementById('modalNationCount').textContent = '0';
@@ -1461,6 +1526,21 @@ function renderNationsModal() {
     list.appendChild(row);
   });
 }
+
+// Modal tab switches
+document.getElementById('tabNationsBtn').addEventListener('click', () => {
+  activeLeaderboardTab = 'nations';
+  document.getElementById('tabNationsBtn').classList.add('active');
+  document.getElementById('tabCitiesBtn').classList.remove('active');
+  renderNationsModal();
+});
+
+document.getElementById('tabCitiesBtn').addEventListener('click', () => {
+  activeLeaderboardTab = 'cities';
+  document.getElementById('tabCitiesBtn').classList.add('active');
+  document.getElementById('tabNationsBtn').classList.remove('active');
+  renderNationsModal();
+});
 
 // Modal open/close
 const modalEl = document.getElementById('nationsModal');
@@ -1691,14 +1771,17 @@ function updateScoreUI(d){
     updateCountdown();
   }
 
-  // Top nations leaderboard
+  // Top nations & cities leaderboard
   if (d.top_countries && d.top_countries.length > 0) {
     latestTopCountries = d.top_countries;
     const topStr = d.top_countries.slice(0, 3).map(c => `${countryFlag(c.country)} ${fmtNum(c.dips)}`).join(' · ');
     document.getElementById('topNations').textContent = topStr;
-    if (modalEl.classList.contains('open')) {
-      renderNationsModal();
-    }
+  }
+  if (d.top_cities) {
+    latestTopCities = d.top_cities;
+  }
+  if (modalEl.classList.contains('open')) {
+    renderNationsModal();
   }
 
   // All-time
