@@ -110,6 +110,7 @@ export class GlobalWarDO extends DurableObject<Env> {
   // Country & City dip breakdown
   private countryDips: Record<string, number> = {};
   private cityDips: Record<string, number> = {};
+  private warPosition: number = 50; // Global shared rope position (0 = 100% Dimmie, 50 = Center, 100 = 100% Tendie)
 
   private sockets: Map<WebSocket, SocketMetadata> = new Map();
   private ipStates: Map<string, IpRateState> = new Map();
@@ -121,6 +122,7 @@ export class GlobalWarDO extends DurableObject<Env> {
     super(ctx, env);
     this.ctx.blockConcurrencyWhile(async () => {
       const s = this.ctx.storage;
+      this.warPosition = (await s.get<number>('war_position')) ?? 50;
 
       // v4: Restore exact scores from snapshot and apply Swiss -5k deduction
       const version = (await s.get<number>('schema_version')) ?? 0;
@@ -238,11 +240,13 @@ export class GlobalWarDO extends DurableObject<Env> {
     // Reset for the current week
     this.weeklyTendie = 0;
     this.weeklyDimmie = 0;
+    this.warPosition = 50;
     this.weekStart = getMonday(now);
 
     // Persist rollover state
     this.ctx.storage.put('weekly_tendie', 0);
     this.ctx.storage.put('weekly_dimmie', 0);
+    this.ctx.storage.put('war_position', 50);
     this.ctx.storage.put('week_start', this.weekStart);
     this.ctx.storage.put('weeks_won_tendie', this.weeksWonTendie);
     this.ctx.storage.put('weeks_won_dimmie', this.weeksWonDimmie);
@@ -272,6 +276,7 @@ export class GlobalWarDO extends DurableObject<Env> {
       dimmie_dips: this.dimmieDips,
       weekly_tendie: this.weeklyTendie,
       weekly_dimmie: this.weeklyDimmie,
+      war_position: Math.round(this.warPosition),
       weeks_won_tendie: this.weeksWonTendie,
       weeks_won_dimmie: this.weeksWonDimmie,
       week_ends: this.weekStart + WEEK_MS,
@@ -601,9 +606,11 @@ export class GlobalWarDO extends DurableObject<Env> {
           if (data.side === 'tendie') {
             this.tendieDips += count;
             this.weeklyTendie += count;
+            this.warPosition = Math.min(100, this.warPosition + count * 0.4);
           } else {
             this.dimmieDips += count;
             this.weeklyDimmie += count;
+            this.warPosition = Math.max(0, this.warPosition - count * 0.4);
           }
 
           if (meta.country && meta.country !== 'XX') {
@@ -782,6 +789,7 @@ export class GlobalWarDO extends DurableObject<Env> {
       await this.ctx.storage.put('dimmie_dips', this.dimmieDips);
       await this.ctx.storage.put('weekly_tendie', this.weeklyTendie);
       await this.ctx.storage.put('weekly_dimmie', this.weeklyDimmie);
+      await this.ctx.storage.put('war_position', this.warPosition);
       await this.ctx.storage.put('country_dips', this.countryDips);
       await this.ctx.storage.put('city_dips', this.cityDips);
 

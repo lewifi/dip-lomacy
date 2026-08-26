@@ -163,22 +163,30 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
 
 /* Center Banner between pills */
 .weekly-wins-banner{
-  position:absolute; bottom:min(13.8vh, 92px); left:50%; transform:translateX(-50%);
-  display:inline-flex; align-items:center; justify-content:center;
-  gap:5px; padding:6px 14px;
-  background:rgba(26, 16, 8, 0.85); border:1px solid rgba(245, 158, 11, 0.5);
-  border-radius:20px; font-family:"Space Mono",monospace;
-  font-size:10px; font-weight:700; letter-spacing:1.5px;
-  text-transform:uppercase; color:#fef08a;
+  position:absolute; bottom:min(13vh, 88px); left:50%; transform:translateX(-50%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:2px; padding:6px 16px;
+  background:rgba(26, 16, 8, 0.88); border:1px solid rgba(245, 158, 11, 0.5);
+  border-radius:20px; font-family:"Space Mono",monospace; text-align:center;
   box-shadow:0 4px 16px rgba(0,0,0,0.35);
   backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
   z-index:20; pointer-events:none; white-space:nowrap;
 }
+.banner-title{
+  font-size:10px; font-weight:700; letter-spacing:1.5px;
+  text-transform:uppercase; color:#fef08a; line-height:1.1;
+}
+.banner-sub{
+  font-size:8.5px; font-weight:600; letter-spacing:0.5px;
+  color:rgba(255,255,255,0.7); line-height:1.1;
+}
 @media (max-width: 768px), (orientation: portrait) {
   .weekly-wins-banner{
     bottom:auto; top:50%; transform:translate(-50%, -50%);
-    font-size:8px; padding:3px 9px; letter-spacing:1px;
+    padding:4px 12px;
   }
+  .banner-title{ font-size:8.5px; letter-spacing:1px; }
+  .banner-sub{ font-size:7.5px; }
 }
 
 /* ---- Live ticker ---- */
@@ -867,7 +875,10 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
       </div>
     </div>
     
-    <div class="weekly-wins-banner" id="weeklyWinsBanner">🏆 WEEKLY % WINNER WINS</div>
+    <div class="weekly-wins-banner" id="weeklyWinsBanner">
+      <span class="banner-title">🏆 WEEKLY % WINNER WINS</span>
+      <span class="banner-sub" id="weeklyDipsSub">— dips this week</span>
+    </div>
 
     <div class="stage" id="stageDimmie">
       <div class="svg-wrap" id="wrapDimmie"></div>
@@ -1222,25 +1233,24 @@ function bumpStageScore(side) {
 // ---- Direct Percentage Battle Engine ----
 let currentWeeklyScores = { tendie: 0, dimmie: 0 };
 let activeLiveImpulse = 0; // Direct percentage points offset (-35% to +35%)
-let liveCombo = 0;
-let lastDipTs = 0;
+let serverWarPosition = null;
 
 function renderWarBar() {
-  const wt = currentWeeklyScores.tendie || 0;
-  const wd = currentWeeklyScores.dimmie || 0;
-  const total = wt + wd;
-
-  // 1. Authoritative Weekly Baseline Percentage (smooth proportional tilt)
-  // Tendie +323 lead sits at ~54% Tendie / 46% Dimmie baseline
-  let weeklyBaseline = 50;
-  if (total > 0) {
-    const rawRatio = (wt - wd) / total; // e.g. +0.011 (1.1% lead)
-    weeklyBaseline = 50 + (rawRatio * 50 * 5.0); // mapped smoothly to 40%..60%
-    weeklyBaseline = Math.max(35, Math.min(65, weeklyBaseline));
+  let baseline = 50;
+  if (serverWarPosition !== null) {
+    baseline = serverWarPosition;
+  } else {
+    const wt = currentWeeklyScores.tendie || 0;
+    const wd = currentWeeklyScores.dimmie || 0;
+    const total = wt + wd;
+    if (total > 0) {
+      const rawRatio = (wt - wd) / total;
+      baseline = Math.max(20, Math.min(80, Math.round(50 + (rawRatio * 50 * 5.0))));
+    }
   }
 
-  // 2. Direct Live Tap Movement: Every tap adds ±1.0% to ±2.2% directly (full 0% to 100% range)
-  const tPct = Math.max(0, Math.min(100, Math.round(weeklyBaseline + activeLiveImpulse)));
+  // Direct Live Tap Movement: Every tap adds ±1.0% to ±2.2% directly (full 0% to 100% range)
+  const tPct = Math.max(0, Math.min(100, Math.round(baseline + activeLiveImpulse)));
   const dPct = 100 - tPct;
 
   const warT = document.getElementById('warT');
@@ -1927,13 +1937,19 @@ function updateScoreUI(d){
   const wd = (d.weekly_dimmie !== undefined && d.weekly_dimmie > 0) ? d.weekly_dimmie : (d.dimmie_dips || 0);
   currentWeeklyScores.tendie = wt;
   currentWeeklyScores.dimmie = wd;
+  if (d.war_position !== undefined) {
+    serverWarPosition = d.war_position;
+  }
   renderWarBar();
 
-  // Update on-stage prominent score counters
-  const stEl = document.getElementById('stageTendieScore');
-  const sdEl = document.getElementById('stageDimmieScore');
-  if (stEl) stEl.textContent = fmtNum(wt);
-  if (sdEl) sdEl.textContent = fmtNum(wd);
+  // Update all-time footer and weekly dips sub-label
+  const atT = document.getElementById('atTendie');
+  const atD = document.getElementById('atDimmie');
+  if (atT) atT.textContent = fmtNum(d.tendie_dips || 0);
+  if (atD) atD.textContent = fmtNum(d.dimmie_dips || 0);
+
+  const subEl = document.getElementById('weeklyDipsSub');
+  if (subEl) subEl.textContent = `${fmtNum(wt + wd)} dips this week`;
 
   if (d.week_ends) {
     weekEndsTs = d.week_ends;
