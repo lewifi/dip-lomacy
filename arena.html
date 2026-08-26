@@ -1439,16 +1439,9 @@ function triggerDip(side, isRemote = false){
 
   const setAngle = a => {
     const tf = `rotate(${a}deg)`;
-    rig.rotors.forEach(r => {
-      r.style.transformOrigin = `${pivotX}px ${pivotY}px`;
-      r.style.transform = tf;
-      r.setAttribute('transform', `rotate(${a} ${pivotX} ${pivotY})`);
-    });
+    rig.rotors.forEach(r => { r.style.transformOrigin=`${pivotX}px ${pivotY}px`; r.style.transform=tf; });
   };
-  const spin = deg => rig.spinners.forEach(s => {
-    s.style.transform = `rotate(${deg}deg)`;
-    s.setAttribute('transform', `rotate(${deg})`);
-  });
+  const spin = deg => rig.spinners.forEach(s => s.style.transform=`rotate(${deg}deg)`);
 
   rig.gingers.forEach(g => g.classList.remove('ginger-jiggle'));
   requestAnimationFrame(() => rig.gingers.forEach(g => g.classList.add('ginger-jiggle')));
@@ -1657,22 +1650,8 @@ function handleUserDip(side){
   wsSend(side);
 }
 
-function bindStageInteraction(id, side) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  let lastTouch = 0;
-  el.addEventListener('pointerdown', (e) => {
-    lastTouch = Date.now();
-    handleUserDip(side);
-  });
-  el.addEventListener('click', (e) => {
-    if (Date.now() - lastTouch < 100) return; // prevent duplicate trigger from pointerdown+click
-    handleUserDip(side);
-  });
-}
-
-bindStageInteraction('stageTendie', 'tendie');
-bindStageInteraction('stageDimmie', 'dimmie');
+document.getElementById('stageTendie').addEventListener('click', () => handleUserDip('tendie'));
+document.getElementById('stageDimmie').addEventListener('click', () => handleUserDip('dimmie'));
 document.addEventListener('keydown', e => {
   if(e.code==='KeyA'||e.code==='ArrowLeft'){ handleUserDip('tendie'); }
   if(e.code==='KeyD'||e.code==='ArrowRight'){ handleUserDip('dimmie'); }
