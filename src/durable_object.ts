@@ -303,7 +303,7 @@ export class GlobalWarDO extends DurableObject<Env> {
       // Admin trigger: force instant live page refresh on all connected clients
       if (request.method === 'POST' && url.pathname === '/reload-all') {
         this.broadcast(JSON.stringify({ type: 'force_reload' }));
-        return new Response(JSON.stringify({ status: 'ok', reloaded_clients: this.sockets.size }), {
+        return new Response(JSON.stringify({ status: 'ok', reloaded_clients: this.ctx.getWebSockets().length }), {
           headers: { 'Content-Type': 'application/json' },
         });
       }
