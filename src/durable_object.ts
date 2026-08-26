@@ -793,17 +793,18 @@ export class GlobalWarDO extends DurableObject<Env> {
       await this.ctx.storage.put('country_dips', this.countryDips);
       await this.ctx.storage.put('city_dips', this.cityDips);
 
-      // Fan out update to all connected clients (getWebSockets survives
-      // hibernation, so woken DOs still reach tabs opened before the nap).
       const payload = this.buildPayload('tick');
-
-      for (const socket of this.ctx.getWebSockets()) {
-        try {
-          socket.send(payload);
-        } catch {
-          // Socket closed ungracefully
-        }
-      }
+      this.broadcast(payload);
     }, 100);
+  }
+
+  private broadcast(payload: string) {
+    for (const socket of this.ctx.getWebSockets()) {
+      try {
+        socket.send(payload);
+      } catch {
+        // Socket closed ungracefully
+      }
+    }
   }
 }
