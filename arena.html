@@ -161,6 +161,26 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   box-shadow:0 12px 30px rgba(0,0,0,0.3);
 }
 
+/* Center Banner between pills */
+.weekly-wins-banner{
+  position:absolute; bottom:min(13.8vh, 92px); left:50%; transform:translateX(-50%);
+  display:inline-flex; align-items:center; justify-content:center;
+  gap:5px; padding:6px 14px;
+  background:rgba(26, 16, 8, 0.85); border:1px solid rgba(245, 158, 11, 0.5);
+  border-radius:20px; font-family:"Space Mono",monospace;
+  font-size:10px; font-weight:700; letter-spacing:1.5px;
+  text-transform:uppercase; color:#fef08a;
+  box-shadow:0 4px 16px rgba(0,0,0,0.35);
+  backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  z-index:20; pointer-events:none; white-space:nowrap;
+}
+@media (max-width: 768px), (orientation: portrait) {
+  .weekly-wins-banner{
+    bottom:auto; top:50%; transform:translate(-50%, -50%);
+    font-size:8px; padding:3px 9px; letter-spacing:1px;
+  }
+}
+
 /* ---- Live ticker ---- */
 .live-ticker{
   display:inline-flex; align-items:center; gap:6px;
@@ -849,6 +869,9 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
         <span class="pill-score" id="stageTendieScore">—</span>
       </div>
     </div>
+    
+    <div class="weekly-wins-banner" id="weeklyWinsBanner">🏆 WEEKLY TOTAL WINS THE WEEK</div>
+
     <div class="stage" id="stageDimmie">
       <div class="svg-wrap" id="wrapDimmie"></div>
       <div class="faction-pill dimmie-pill" id="dimmieScoreBadge">
@@ -1201,49 +1224,44 @@ function bumpStageScore(side) {
 
 // ---- Exact Asymmetrical 80/60 Elastic Tug-of-War Engine ----
 let currentWeeklyScores = { tendie: 0, dimmie: 0 };
-let activeOffset = 0; // Elastic active momentum offset (-40 to +40)
+let currentWarOffset = null; // Direct active offset clamped strictly between min and max
 
-function renderWarBar() {
+function getWarBounds() {
   const wt = currentWeeklyScores.tendie || 0;
   const wd = currentWeeklyScores.dimmie || 0;
   const total = wt + wd;
 
-  // Exact Threshold Dynamics:
-  // 0 to 100 Left to Right (Tendie = 0..50, Dimmie = 50..100, Middle = 50)
-  //
-  // WHEN TENDIE LEADS (wt >= wd):
-  //   - Tendie Dominant Push: can push up to 80% Tendie (tPct = 80%)
-  //   - Tendie Resting Baseline: never below 50% Tendie (tPct >= 50% idle)
-  //   - Dimmie Max Counter: can push up to 60% Dimmie (tPct = 40%), never beyond until score flips
-  //
-  // WHEN DIMMIE LEADS (wd > wt):
-  //   - Dimmie Dominant Push: can push up to 80% Dimmie (tPct = 20%, dPct = 80%)
-  //   - Dimmie Resting Baseline: never below 50% Dimmie (dPct >= 50% idle)
-  //   - Tendie Max Counter: can push up to 60% Tendie (tPct = 60%, dPct = 40%), never beyond until score flips
-
-  let minOffset = -10; // 50 - 10 = 40% Tendie (60% Dimmie)
-  let maxOffset = +30; // 50 + 30 = 80% Tendie (20% Dimmie)
-  let restingLeadBias = 0;
+  let minOffset = -10; // 50 - 10 = 40% Tendie (60% Dimmie counter limit)
+  let maxOffset = +30; // 50 + 30 = 80% Tendie (20% Dimmie dominant limit)
+  let baseBias = 0;
 
   if (wt >= wd) {
-    minOffset = -10; // Dimmie can counter up to 60% Dimmie (tPct = 40%)
-    maxOffset = +30; // Tendie can push up to 80% Tendie (tPct = 80%)
+    minOffset = -10; // Dimmie can counter up to 60% Dimmie (40% Tendie)
+    maxOffset = +30; // Tendie can push up to 80% Tendie
     if (total > 0) {
-      const rawRatio = (wt - wd) / total;
-      restingLeadBias = Math.min(8, Math.max(0, rawRatio * 35)); // Resting point 50%..58% Tendie
+      baseBias = Math.min(8, Math.max(0, ((wt - wd) / total) * 35)); // Resting point 50%..58% Tendie
     }
   } else {
-    minOffset = -30; // Dimmie can push up to 80% Dimmie (tPct = 20%)
-    maxOffset = +10; // Tendie can counter up to 60% Tendie (tPct = 60%)
+    minOffset = -30; // Dimmie can push up to 80% Dimmie (20% Tendie)
+    maxOffset = +10; // Tendie can counter up to 60% Tendie (60% Tendie)
     if (total > 0) {
-      const rawRatio = (wd - wt) / total;
-      restingLeadBias = -Math.min(8, Math.max(0, rawRatio * 35)); // Resting point 50%..58% Dimmie
+      baseBias = -Math.min(8, Math.max(0, ((wd - wt) / total) * 35)); // Resting point 50%..58% Dimmie
     }
   }
 
-  // Elastic position strictly clamped between the dynamic leader/counter thresholds
-  const currentOffset = Math.max(minOffset, Math.min(maxOffset, restingLeadBias + activeOffset));
-  const tPct = Math.round(50 + currentOffset);
+  return { minOffset, maxOffset, baseBias };
+}
+
+function renderWarBar() {
+  const { minOffset, maxOffset, baseBias } = getWarBounds();
+
+  if (currentWarOffset === null) {
+    currentWarOffset = baseBias;
+  }
+  // Strictly clamped: zero invisible buffer lag
+  currentWarOffset = Math.max(minOffset, Math.min(maxOffset, currentWarOffset));
+
+  const tPct = Math.round(50 + currentWarOffset);
   const dPct = 100 - tPct;
 
   const warT = document.getElementById('warT');
@@ -1258,19 +1276,23 @@ function renderWarBar() {
 }
 
 function applyDipImpulse(side) {
-  // Elastic spring impulse: each tap pulls 2.5 units toward the side
-  // 4 taps = 10 units shift
-  // 12 taps = full threshold reach (80% leader / 60% counter)
-  const pull = side === 'tendie' ? 2.5 : -2.5;
-  activeOffset = Math.max(-35, Math.min(35, activeOffset + pull));
+  const { minOffset, maxOffset, baseBias } = getWarBounds();
+  if (currentWarOffset === null) currentWarOffset = baseBias;
+
+  // Immediate 3.0% shift per tap: zero lag
+  const pull = side === 'tendie' ? 3.0 : -3.0;
+  currentWarOffset = Math.max(minOffset, Math.min(maxOffset, currentWarOffset + pull));
   renderWarBar();
 }
 
-// Gentle idle drift: active momentum smoothly settles back to 0 (resting on the score lead baseline)
+// Gentle idle drift: smoothly relaxes back toward the score baseline (baseBias)
 setInterval(() => {
-  if (Math.abs(activeOffset) > 0.1) {
-    activeOffset *= 0.993;
-    renderWarBar();
+  if (currentWarOffset !== null) {
+    const { baseBias } = getWarBounds();
+    if (Math.abs(currentWarOffset - baseBias) > 0.2) {
+      currentWarOffset += (baseBias - currentWarOffset) * 0.01;
+      renderWarBar();
+    }
   }
 }, 1000);
 
