@@ -295,6 +295,14 @@ export class GlobalWarDO extends DurableObject<Env> {
         return this.runReminders();
       }
 
+      // Admin trigger: force instant live page refresh on all connected clients
+      if (request.method === 'POST' && url.pathname === '/reload-all') {
+        this.broadcast(JSON.stringify({ type: 'force_reload' }));
+        return new Response(JSON.stringify({ status: 'ok', reloaded_clients: this.sockets.size }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
       // Plain GET → return current scores as JSON
       this.maybeRollover();
       return new Response(this.buildPayload('init'), {

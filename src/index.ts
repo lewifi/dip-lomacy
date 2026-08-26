@@ -240,14 +240,30 @@ app.post('/api/subscribe', async (c) => {
   return new Response(res.body, { status: res.status, headers: { 'Content-Type': 'application/json' } });
 });
 
-app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', version: '0.5.0' });
+app.post('/api/admin/reload-all', async (c) => {
+  const id = c.env.GLOBAL_WAR.idFromName('global-war-v1');
+  const stub = c.env.GLOBAL_WAR.get(id);
+  const res = await stub.fetch(new Request('https://dummy/reload-all', { method: 'POST' }));
+  return new Response(res.body, { status: res.status, headers: { 'Content-Type': 'application/json' } });
 });
 
-// Fallback to static assets
+app.get('/api/health', (c) => {
+  return c.json({ status: 'ok', version: '0.6.0' });
+});
+
+// Fallback to static assets with strict HTML cache busting
 app.all('*', async (c) => {
   if (c.env.ASSETS) {
-    return c.env.ASSETS.fetch(c.req.raw);
+    const res = await c.env.ASSETS.fetch(c.req.raw);
+    const contentType = res.headers.get('content-type') || '';
+    if (contentType.includes('text/html')) {
+      const headers = new Headers(res.headers);
+      headers.set('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      headers.set('Pragma', 'no-cache');
+      headers.set('Expires', '0');
+      return new Response(res.body, { status: res.status, headers });
+    }
+    return res;
   }
   return c.text('Not found', 404);
 });

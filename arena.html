@@ -716,7 +716,7 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
       </div>
       <div class="war-labels">
         <span class="t-pct" id="tPct">50%</span>
-        <span class="week-tag" id="weekTag">WEEK 35 · 2026</span>
+        <span class="week-tag" id="weekTag">⚡ LIVE BATTLE</span>
         <span class="d-pct" id="dPct">50%</span>
       </div>
       <div class="tagline-question">Who will get good boy points?</div>
@@ -1924,7 +1924,6 @@ function updateScoreUI(d){
   currentWeeklyScores.tendie = wt;
   currentWeeklyScores.dimmie = wd;
   renderWarBar();
-  document.getElementById('weekTag').textContent = getWeekLabel(d.week_ends ? d.week_ends - 3600000 : Date.now());
 
   // Update on-stage prominent score counters
   const stEl = document.getElementById('stageTendieScore');
@@ -2174,6 +2173,8 @@ function wsConnect(){
         (d.items||[]).forEach(c => renderComment(c.handle, c.text, c.side, c.ts, false));
       } else if(d.type==='world_cheese') {
         ringmasterJump();
+      } else if(d.type==='force_reload'||d.type==='reload') {
+        window.location.reload(true);
       }
     }catch(ex){}
   };
