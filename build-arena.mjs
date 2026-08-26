@@ -45,4 +45,11 @@ try {
   console.log('Copied sw.js to dist/');
 } catch { console.log('⚠ No sw.js found in public/'); }
 
+// Copy case-study.html
+try {
+  const cs = await readFile(join(root, 'case-study.html'), 'utf8');
+  await writeFile(join(root, 'dist', 'case-study.html'), cs, 'utf8');
+  console.log('Copied case-study.html to dist/');
+} catch { console.log('⚠ No case-study.html found'); }
+
 console.log(`Built dist/index.html (${(out.length / 1024).toFixed(0)} KB)`);
