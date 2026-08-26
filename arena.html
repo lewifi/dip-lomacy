@@ -1322,6 +1322,76 @@ function addTickerDip(side, country, city) {
   document.getElementById('tickerText').textContent = '⚡ LATEST: ' + tickerQueue.slice(0, 3).join(' · ');
 }
 
+// ---- Web Audio SFX Synthesizer ----
+let audioCtx = null;
+let sfxEnabled = true;
+
+function initAudio() {
+  if (!audioCtx) {
+    const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+    if (AudioCtxClass) audioCtx = new AudioCtxClass();
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function playDipSound(side) {
+  if (!sfxEnabled) return;
+  initAudio();
+  if (!audioCtx) return;
+
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  if (side === 'tendie') {
+    // Crunchy crisp pop/squish: 540Hz down to 160Hz
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(540, now);
+    osc.frequency.exponentialRampToValueAtTime(160, now + 0.11);
+
+    gain.gain.setValueAtTime(0.24, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+  } else {
+    // Juicy squishy dip: 340Hz down to 110Hz
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(340, now);
+    osc.frequency.exponentialRampToValueAtTime(110, now + 0.13);
+
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+  }
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.14);
+}
+
+function playCheeseyBoing() {
+  if (!sfxEnabled) return;
+  initAudio();
+  if (!audioCtx) return;
+
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(260, now);
+  osc.frequency.linearRampToValueAtTime(480, now + 0.07);
+  osc.frequency.exponentialRampToValueAtTime(280, now + 0.16);
+
+  gain.gain.setValueAtTime(0.14, now);
+  gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+  osc.connect(gain);
+  gain.connect(audioCtx.destination);
+  osc.start(now);
+  osc.stop(now + 0.18);
+}
+
 // ---- Dip trigger ----
 // ---- Cheesey the Ringmaster: a slight fat hop on every dip (throttled ~5/sec) ----
 const ringmasterEl = document.getElementById('ringmaster');
@@ -1331,6 +1401,7 @@ function ringmasterJump(){
   const now = performance.now();
   if(now - rmLastJump < 200) return; // throttle so a mash-storm reads as lively, not a blur
   rmLastJump = now;
+  playCheeseyBoing();
   ringmasterEl.classList.remove('jumping');
   void ringmasterEl.offsetWidth; // reflow to restart the animation
   ringmasterEl.classList.add('jumping');
@@ -1368,9 +1439,16 @@ function triggerDip(side, isRemote = false){
 
   const setAngle = a => {
     const tf = `rotate(${a}deg)`;
-    rig.rotors.forEach(r => { r.style.transformOrigin=`${pivotX}px ${pivotY}px`; r.style.transform=tf; });
+    rig.rotors.forEach(r => {
+      r.style.transformOrigin = `${pivotX}px ${pivotY}px`;
+      r.style.transform = tf;
+      r.setAttribute('transform', `rotate(${a} ${pivotX} ${pivotY})`);
+    });
   };
-  const spin = deg => rig.spinners.forEach(s => s.style.transform=`rotate(${deg}deg)`);
+  const spin = deg => rig.spinners.forEach(s => {
+    s.style.transform = `rotate(${deg}deg)`;
+    s.setAttribute('transform', `rotate(${deg})`);
+  });
 
   rig.gingers.forEach(g => g.classList.remove('ginger-jiggle'));
   requestAnimationFrame(() => rig.gingers.forEach(g => g.classList.add('ginger-jiggle')));
@@ -1569,21 +1647,32 @@ tick();
 let lastUserDipTime = 0;
 function handleUserDip(side){
   const now = Date.now();
-  const elapsed = now - lastUserDipTime;
-  if(elapsed < 1000){
-    const remaining = Math.ceil((1000 - elapsed) / 1000);
-    showToast(`⏳ Slow down! Wait ${remaining}s before dipping.`);
-    return;
-  }
+  if(now - lastUserDipTime < 60) return; // 60ms debounce for touch bounce
   lastUserDipTime = now;
+  playDipSound(side);
   spawnDipBubble(side, '', '', true);
   triggerDip(side, false);
   recordUserDip(side);
+  applyDipImpulse(side);
   wsSend(side);
 }
 
-document.getElementById('stageTendie').addEventListener('click', () => handleUserDip('tendie'));
-document.getElementById('stageDimmie').addEventListener('click', () => handleUserDip('dimmie'));
+function bindStageInteraction(id, side) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  let lastTouch = 0;
+  el.addEventListener('pointerdown', (e) => {
+    lastTouch = Date.now();
+    handleUserDip(side);
+  });
+  el.addEventListener('click', (e) => {
+    if (Date.now() - lastTouch < 100) return; // prevent duplicate trigger from pointerdown+click
+    handleUserDip(side);
+  });
+}
+
+bindStageInteraction('stageTendie', 'tendie');
+bindStageInteraction('stageDimmie', 'dimmie');
 document.addEventListener('keydown', e => {
   if(e.code==='KeyA'||e.code==='ArrowLeft'){ handleUserDip('tendie'); }
   if(e.code==='KeyD'||e.code==='ArrowRight'){ handleUserDip('dimmie'); }

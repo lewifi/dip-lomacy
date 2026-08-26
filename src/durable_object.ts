@@ -79,10 +79,10 @@ function hashIp(ip: string): string {
 }
 
 // Rate limiting parameters (1-second rate limited dipper profile)
-const BUCKET_CAPACITY = 150;
-const TOKEN_REFILL_RATE = 12.0; // tokens per second
-const MIN_DIP_INTERVAL_MS = 800; // hard 0.8-second server-side minimum interval between dips (200ms latency buffer)
-const MAX_DIPS_PER_MINUTE = 600; // generous session headroom (up to 10 dips/sec sustained)
+const BUCKET_CAPACITY = 200;
+const TOKEN_REFILL_RATE = 15.0; // tokens per second
+const MIN_DIP_INTERVAL_MS = 60; // 60ms server-side gate allowing natural human rapid clicking
+const MAX_DIPS_PER_MINUTE = 900; // generous arcade session headroom
 const MAX_CONCURRENT_SOCKETS_PER_IP = 15;
 const HUMAN_COOLDOWN_MS = 5 * 1000; // 5-second short breather if capacity fully exhausted
 
