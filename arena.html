@@ -858,23 +858,22 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
     </div>
   </div>
 
-  <!-- Milestone / Share Toast -->
-  <div class="toast-msg" id="toastMsg">✓ Copied to clipboard!</div>
-
   <div class="stages">
     <div class="stage" id="stageTendie">
       <div class="svg-wrap" id="wrapTendie"></div>
       <div class="faction-pill tendie-pill" id="tendieScoreBadge">
         <span class="pill-name">TENDIE</span>
+        <span class="pill-score" id="stageTendieScore">50%</span>
       </div>
     </div>
     
-    <div class="weekly-wins-banner" id="weeklyWinsBanner">🏆 WEEKLY TOTAL WINS THE WEEK</div>
+    <div class="weekly-wins-banner" id="weeklyWinsBanner">🏆 WEEKLY % WINNER WINS</div>
 
     <div class="stage" id="stageDimmie">
       <div class="svg-wrap" id="wrapDimmie"></div>
       <div class="faction-pill dimmie-pill" id="dimmieScoreBadge">
         <span class="pill-name">DIMMIE</span>
+        <span class="pill-score" id="stageDimmieScore">50%</span>
       </div>
     </div>
   </div>
@@ -1220,22 +1219,28 @@ function bumpStageScore(side) {
   setTimeout(() => badge.classList.remove('bump'), 220);
 }
 
-// ---- Lead Window Tug-of-War Engine (±500 Point Battle Window) ----
+// ---- Direct Percentage Battle Engine ----
 let currentWeeklyScores = { tendie: 0, dimmie: 0 };
+let activeLiveImpulse = 0; // Direct percentage points offset (-35% to +35%)
+let liveCombo = 0;
+let lastDipTs = 0;
 
 function renderWarBar() {
   const wt = currentWeeklyScores.tendie || 0;
   const wd = currentWeeklyScores.dimmie || 0;
-  const delta = wt - wd; // Positive = Tendie leads, Negative = Dimmie leads
+  const total = wt + wd;
 
-  // 500-point lead window:
-  // - Tied (0 lead) = 50% / 50%
-  // - Tendie +200 ahead = 68% Tendie / 32% Dimmie
-  // - Tendie +500 ahead = 95% Tendie / 5% Dimmie (Max dominance)
-  // - Dimmie +200 ahead = 32% Tendie / 68% Dimmie
-  // - Dimmie +500 ahead = 5% Tendie / 95% Dimmie (Max dominance)
-  const leadRatio = Math.max(-1, Math.min(1, delta / 500));
-  const tPct = Math.max(5, Math.min(95, Math.round(50 + (leadRatio * 45))));
+  // 1. Authoritative Weekly Baseline Percentage (smooth proportional tilt)
+  // Tendie +323 lead sits at ~54% Tendie / 46% Dimmie baseline
+  let weeklyBaseline = 50;
+  if (total > 0) {
+    const rawRatio = (wt - wd) / total; // e.g. +0.011 (1.1% lead)
+    weeklyBaseline = 50 + (rawRatio * 50 * 5.0); // mapped smoothly to 40%..60%
+    weeklyBaseline = Math.max(35, Math.min(65, weeklyBaseline));
+  }
+
+  // 2. Direct Live Tap Movement: Every tap adds ±1.0% to ±2.2% directly!
+  const tPct = Math.max(5, Math.min(95, Math.round(weeklyBaseline + activeLiveImpulse)));
   const dPct = 100 - tPct;
 
   const warT = document.getElementById('warT');
@@ -1247,17 +1252,52 @@ function renderWarBar() {
   if (warD) warD.style.width = dPct + '%';
   if (tEl) tEl.textContent = tPct + '%';
   if (dEl) dEl.textContent = dPct + '%';
+
+  // Live percentage on stage pills
+  const stEl = document.getElementById('stageTendieScore');
+  const sdEl = document.getElementById('stageDimmieScore');
+  if (stEl) stEl.textContent = tPct + '%';
+  if (sdEl) sdEl.textContent = dPct + '%';
 }
 
 function applyDipImpulse(side) {
-  // Every tap immediately updates the local score and recalculates the bar
+  const now = Date.now();
+  if (now - lastDipTs < 1400) {
+    liveCombo += 1;
+  } else {
+    liveCombo = 1;
+  }
+  lastDipTs = now;
+
+  // 1 tap directly moves the bar by 1.0% to 2.2% without any division debt!
+  let pctPerTap = 1.0;
+  if (liveCombo >= 8) {
+    pctPerTap = 2.2; // Combo Rampage!
+  } else if (liveCombo >= 4) {
+    pctPerTap = 1.5;
+  }
+
+  const shift = side === 'tendie' ? pctPerTap : -pctPerTap;
+  activeLiveImpulse += shift;
+  activeLiveImpulse = Math.max(-35, Math.min(35, activeLiveImpulse));
+
+  // Score count
   if (side === 'tendie') {
     currentWeeklyScores.tendie = (currentWeeklyScores.tendie || 0) + 1;
   } else {
     currentWeeklyScores.dimmie = (currentWeeklyScores.dimmie || 0) + 1;
   }
+
   renderWarBar();
 }
+
+// Gentle settling only after 3 seconds of complete inactivity
+setInterval(() => {
+  if (Date.now() - lastDipTs > 3000 && Math.abs(activeLiveImpulse) > 0.2) {
+    activeLiveImpulse *= 0.96;
+    renderWarBar();
+  }
+}, 300);
 
 
 // Live Ticker updates
