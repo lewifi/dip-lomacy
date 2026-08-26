@@ -78,8 +78,8 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   border:1px solid rgba(0,0,0,.15); box-shadow:0 1px 4px rgba(0,0,0,.12);
   background:#222; border-radius:6px;
 }
-.war-fill-t{ background:#d97706; transition:width .4s ease; }
-.war-fill-d{ background:#dc2626; transition:width .4s ease; }
+.war-fill-t{ background:#d97706; transition:width 0.35s cubic-bezier(0.34, 1.45, 0.64, 1); }
+.war-fill-d{ background:#dc2626; transition:width 0.35s cubic-bezier(0.34, 1.45, 0.64, 1); }
 .war-labels{
   display:flex; justify-content:space-between; margin-top:5px;
   font-family:"Space Mono",monospace; font-size:14px; font-weight:700;
@@ -126,35 +126,35 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   100% { opacity:0; transform:translate(-50%, 42px) scale(0.92); }
 }
 
-/* Faction Button Pills (Integrated Name + Live Score) */
+/* Faction Button Pills (Integrated Name + Live Weekly Score) */
 .faction-pill{
-  position:absolute; bottom:44px; left:50%; transform:translateX(-50%);
+  position:absolute; bottom:min(13vh, 88px); left:50%; transform:translateX(-50%);
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  gap:3px; padding:10px 28px; border-radius:32px;
+  gap:2px; padding:8px 24px; border-radius:30px;
   font-family:"Space Mono",monospace; text-align:center;
   pointer-events:none; z-index:15;
   box-shadow:0 8px 24px rgba(0,0,0,0.22);
   backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
   transition:transform .18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow .18s ease;
-  min-width:140px;
+  min-width:130px;
 }
 .tendie-pill{
-  background:rgba(254, 243, 199, 0.94);
+  background:rgba(254, 243, 199, 0.95);
   border:2.5px solid #f59e0b;
   color:#b45309;
 }
 .dimmie-pill{
-  background:rgba(254, 226, 226, 0.94);
+  background:rgba(254, 226, 226, 0.95);
   border:2.5px solid #ef4444;
   color:#b91c1c;
 }
 .pill-name{
-  font-size:15px; font-weight:800; letter-spacing:2.5px;
-  text-transform:uppercase; line-height:1;
+  font-size:15px; font-weight:800; letter-spacing:2px;
+  text-transform:uppercase; line-height:1.1;
 }
 .pill-score{
-  font-size:11px; font-weight:700; letter-spacing:0.8px;
-  opacity:0.85; line-height:1;
+  font-size:13px; font-weight:800; letter-spacing:1px;
+  line-height:1.1; opacity:0.9;
 }
 .faction-pill.bump{
   transform:translateX(-50%) scale(1.16);
@@ -844,16 +844,16 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   <div class="stages">
     <div class="stage" id="stageTendie">
       <div class="svg-wrap" id="wrapTendie"></div>
-      <div class="faction-btn-wrap">
-        <div class="faction-label tendie-label">TENDIE</div>
-        <div class="faction-score tendie-score-badge" id="tendieScoreBadge"><span id="stageTendieScore">0</span> DIPS</div>
+      <div class="faction-pill tendie-pill" id="tendieScoreBadge">
+        <span class="pill-name">TENDIE</span>
+        <span class="pill-score" id="stageTendieScore">—</span>
       </div>
     </div>
     <div class="stage" id="stageDimmie">
       <div class="svg-wrap" id="wrapDimmie"></div>
-      <div class="faction-btn-wrap">
-        <div class="faction-label dimmie-label">DIMMIE</div>
-        <div class="faction-score dimmie-score-badge" id="dimmieScoreBadge"><span id="stageDimmieScore">0</span> DIPS</div>
+      <div class="faction-pill dimmie-pill" id="dimmieScoreBadge">
+        <span class="pill-name">DIMMIE</span>
+        <span class="pill-score" id="stageDimmieScore">—</span>
       </div>
     </div>
   </div>
@@ -1185,8 +1185,9 @@ function spawnDipBubble(side, country, city, isLocal = false) {
   document.getElementById('bubbleLayer').appendChild(el);
   setTimeout(() => el.remove(), 1850);
 
-  // Trigger tactile score bump on the on-stage badge
+  // Trigger tactile score bump on the on-stage badge & elastic tug-of-war impulse
   bumpStageScore(side);
+  applyDipImpulse(side);
 }
 
 function bumpStageScore(side) {
@@ -1197,6 +1198,67 @@ function bumpStageScore(side) {
   badge.classList.add('bump');
   setTimeout(() => badge.classList.remove('bump'), 220);
 }
+
+// ---- Dynamic Tug-of-War Engine (Weekly Anchor + Active Momentum) ----
+let currentWeeklyScores = { tendie: 0, dimmie: 0 };
+let activeMomentum = 0; // Live momentum from active dipping (-82 to +82)
+
+function renderWarBar() {
+  const wt = currentWeeklyScores.tendie || 0;
+  const wd = currentWeeklyScores.dimmie || 0;
+  const total = wt + wd;
+
+  // 1. Calculate authoritative weekly score baseline (gentle bias of -14..+14)
+  let weeklyBias = 0;
+  if (total > 0) {
+    const rawRatio = (wt - wd) / total; // -1 to +1
+    weeklyBias = Math.max(-14, Math.min(14, rawRatio * 35));
+  }
+
+  // 2. Add active live momentum (freely drives the bar up to 60%-80%)
+  const totalRope = Math.max(-95, Math.min(95, weeklyBias + activeMomentum));
+
+  // 3. Asymptotic sinusoidal curve: maps smoothly to a natural 10%..90% range
+  // Smashing the button pushes into 60%-80% with rewarding arcade feedback!
+  const normalized = totalRope / 100;
+  const compressed = Math.sin((normalized * Math.PI) / 2);
+  const tPct = Math.max(10, Math.min(90, Math.round(50 + (compressed * 38))));
+  const dPct = 100 - tPct;
+
+  const warT = document.getElementById('warT');
+  const warD = document.getElementById('warD');
+  const tEl = document.getElementById('tPct');
+  const dEl = document.getElementById('dPct');
+
+  if (warT) warT.style.width = tPct + '%';
+  if (warD) warD.style.width = dPct + '%';
+  if (tEl) tEl.textContent = tPct + '%';
+  if (dEl) dEl.textContent = dPct + '%';
+}
+
+function applyDipImpulse(side) {
+  const isPullingForward = (side === 'tendie' && activeMomentum >= 0) || (side === 'dimmie' && activeMomentum <= 0);
+  const currentMagnitude = Math.abs(activeMomentum);
+
+  // Smooth diminishing returns only when pushing past 75%
+  let efficiency = 1.0;
+  if (isPullingForward && currentMagnitude > 45) {
+    efficiency = Math.max(0.25, 1 - Math.pow((currentMagnitude - 45) / 45, 1.4));
+  }
+
+  const baseStep = 3.8;
+  const pull = (side === 'tendie' ? baseStep : -baseStep) * efficiency;
+  activeMomentum = Math.max(-82, Math.min(82, activeMomentum + pull));
+  renderWarBar();
+}
+
+// Gentle idle drift: active momentum smoothly relaxes back toward the true weekly anchor
+setInterval(() => {
+  if (Math.abs(activeMomentum) > 0.1) {
+    activeMomentum *= 0.995;
+    renderWarBar();
+  }
+}, 1000);
 
 // Live Ticker updates
 let tickerQueue = [];
@@ -1820,15 +1882,12 @@ function updateCountdown() {
 setInterval(updateCountdown, 1000);
 
 function updateScoreUI(d){
-  // Weekly tug-of-war bar
-  const wt = d.weekly_tendie||0, wd = d.weekly_dimmie||0;
-  const total = wt+wd;
-  const tPct = total===0 ? 50 : Math.round(wt/total*100);
-  const dPct = 100-tPct;
-  document.getElementById('warT').style.width = tPct+'%';
-  document.getElementById('warD').style.width = dPct+'%';
-  document.getElementById('tPct').textContent = tPct+'%';
-  document.getElementById('dPct').textContent = dPct+'%';
+  // Weekly scores (falls back to cumulative dips if weekly counter not yet initialized)
+  const wt = (d.weekly_tendie !== undefined && d.weekly_tendie > 0) ? d.weekly_tendie : (d.tendie_dips || 0);
+  const wd = (d.weekly_dimmie !== undefined && d.weekly_dimmie > 0) ? d.weekly_dimmie : (d.dimmie_dips || 0);
+  currentWeeklyScores.tendie = wt;
+  currentWeeklyScores.dimmie = wd;
+  renderWarBar();
   document.getElementById('weekTag').textContent = getWeekLabel(d.week_ends ? d.week_ends - 3600000 : Date.now());
 
   // Update on-stage prominent score counters
