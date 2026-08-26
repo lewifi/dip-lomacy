@@ -1234,6 +1234,8 @@ function bumpStageScore(side) {
 let currentWeeklyScores = { tendie: 0, dimmie: 0 };
 let activeLiveImpulse = 0; // Direct percentage points offset (-35% to +35%)
 let serverWarPosition = null;
+let liveCombo = 0;
+let lastDipTs = 0;
 
 function renderWarBar() {
   let baseline = 50;
