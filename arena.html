@@ -1239,8 +1239,8 @@ function renderWarBar() {
     weeklyBaseline = Math.max(35, Math.min(65, weeklyBaseline));
   }
 
-  // 2. Direct Live Tap Movement: Every tap adds ±1.0% to ±2.2% directly!
-  const tPct = Math.max(5, Math.min(95, Math.round(weeklyBaseline + activeLiveImpulse)));
+  // 2. Direct Live Tap Movement: Every tap adds ±1.0% to ±2.2% directly (full 0% to 100% range)
+  const tPct = Math.max(0, Math.min(100, Math.round(weeklyBaseline + activeLiveImpulse)));
   const dPct = 100 - tPct;
 
   const warT = document.getElementById('warT');
@@ -1279,7 +1279,7 @@ function applyDipImpulse(side) {
 
   const shift = side === 'tendie' ? pctPerTap : -pctPerTap;
   activeLiveImpulse += shift;
-  activeLiveImpulse = Math.max(-35, Math.min(35, activeLiveImpulse));
+  activeLiveImpulse = Math.max(-50, Math.min(50, activeLiveImpulse));
 
   // Score count
   if (side === 'tendie') {
