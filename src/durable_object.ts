@@ -29,6 +29,7 @@ export interface Env {
   VAPID_PRIVATE_KEY?: string;
   VAPID_SUBJECT?: string;
   GEMINI_API_KEY?: string;
+  MOD_KEY?: string;
 }
 
 interface SocketMetadata {
@@ -36,8 +37,10 @@ interface SocketMetadata {
   country: string;
   city: string;
   lastDipTime: number;
+  lastBroadcastTime: number;
   dipIntervals: number[];
   continuousDips: number;
+  isBot: boolean;
   lastCommentTime: number;
   lastCheeseTime?: number;
 }
@@ -78,20 +81,21 @@ function hashIp(ip: string): string {
   return (h >>> 0).toString(36).slice(0, 6);
 }
 
-// Rate limiting parameters (1-second rate limited dipper profile)
-const BUCKET_CAPACITY = 200;
-const TOKEN_REFILL_RATE = 15.0; // tokens per second
-const MIN_DIP_INTERVAL_MS = 60; // 60ms server-side gate allowing natural human rapid clicking
-const MAX_DIPS_PER_MINUTE = 900; // generous arcade session headroom
-const MAX_CONCURRENT_SOCKETS_PER_IP = 15;
+// Rate limiting parameters (2-second rate limit profile)
+const BUCKET_CAPACITY = 3;
+const TOKEN_REFILL_RATE = 0.5; // 1 token every 2 seconds
+const MIN_DIP_INTERVAL_MS = 2000; // 2.0-second gate per connection
+const MAX_DIPS_PER_MINUTE = 30; // 30 dips per minute max
+const MAX_CONCURRENT_SOCKETS_PER_IP = 6;
 const HUMAN_COOLDOWN_MS = 5 * 1000; // 5-second short breather if capacity fully exhausted
 
-// Slow-lane: IPs throttled to a 30s visual dip cadence, 10-minute scoreboard count
+// Slow-lane: known persistent bot IPs throttled to a 120s (2-minute) cadence so humans can easily push/dominate
 const SLOW_LANE_IPS = new Set([
   '193.32.127.221',
+  '167.71.60.195',
+  '35.236.214.210',
 ]);
-const SLOW_LANE_INTERVAL_MS = 30 * 1000; // 30 seconds
-const SLOW_LANE_SCORE_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+const SLOW_LANE_INTERVAL_MS = 120 * 1000; // 120 seconds (2 minutes)
 
 export class GlobalWarDO extends DurableObject<Env> {
   // All-time totals
@@ -217,6 +221,59 @@ export class GlobalWarDO extends DurableObject<Env> {
         this.cityDips = seededCities;
         await s.put('city_dips', this.cityDips);
         await s.put('schema_version', 5);
+      }
+
+      // v7: Complete scrub of the bot raid — restore clean legitimate historical scores & 50/50 war
+      if (version < 7) {
+        const cleanCountries: Record<string, number> = {
+          AU: 5447,
+          CH: 4314,
+          US: 1044,
+          CA: 428,
+          NO: 253,
+          TR: 110,
+          CO: 101,
+          MX: 78,
+          SG: 45,
+          GB: 41,
+          DE: 35,
+          BR: 29,
+          FR: 8,
+          BE: 6,
+          IN: 2,
+        };
+
+        const cleanCities: Record<string, number> = {
+          'Brisbane, AU': 3800,
+          'Zurich, CH': 3200,
+          'Geneva, CH': 1114,
+          'Sydney, AU': 1000,
+          'Melbourne, AU': 647,
+          'New York, US': 600,
+          'Los Angeles, US': 444,
+          'Toronto, CA': 250,
+          'Montréal, CA': 178,
+          'Oslo, NO': 253,
+          'London, GB': 41,
+          'Singapore, SG': 45,
+        };
+
+        this.tendieDips = 6604;
+        this.dimmieDips = 5350;
+        this.weeklyTendie = 100;
+        this.weeklyDimmie = 100;
+        this.warPosition = 50;
+        this.countryDips = cleanCountries;
+        this.cityDips = cleanCities;
+
+        await s.put('tendie_dips', 6604);
+        await s.put('dimmie_dips', 5350);
+        await s.put('weekly_tendie', 100);
+        await s.put('weekly_dimmie', 100);
+        await s.put('war_position', 50);
+        await s.put('country_dips', cleanCountries);
+        await s.put('city_dips', cleanCities);
+        await s.put('schema_version', 7);
       }
 
       // Check for rollover on startup
@@ -346,8 +403,10 @@ export class GlobalWarDO extends DurableObject<Env> {
       country,
       city,
       lastDipTime: 0,
+      lastBroadcastTime: 0,
       dipIntervals: [],
       continuousDips: 0,
+      isBot: false,
       lastCommentTime: 0,
     });
 
@@ -410,6 +469,26 @@ export class GlobalWarDO extends DurableObject<Env> {
     }
   }
 
+  // Moderator delete: remove one comment by its timestamp, gated by a shared key.
+  // Verified server-side against the MOD_KEY secret. Fails silently so the endpoint
+  // never confirms whether a key was close or a comment existed.
+  private async handleDeleteComment(ts: unknown, key: unknown) {
+    const expected = this.env.MOD_KEY;
+    if (!expected || typeof key !== 'string' || key !== expected) return;
+    if (typeof ts !== 'number') return;
+
+    const before = this.comments.length;
+    this.comments = this.comments.filter((c) => c.ts !== ts);
+    if (this.comments.length === before) return;
+
+    await this.ctx.storage.put('recent_comments', this.comments);
+
+    const payload = JSON.stringify({ type: 'comment_deleted', ts });
+    for (const socket of this.ctx.getWebSockets()) {
+      try { socket.send(payload); } catch { /* stale socket */ }
+    }
+  }
+
   // A direct tap on Cheesey the Ringmaster: hop him on every other tab too.
   // Purely cosmetic (no score), lightly rate-limited so it can't be flooded.
   private handleCheeseTap(ws: WebSocket) {
@@ -445,8 +524,10 @@ export class GlobalWarDO extends DurableObject<Env> {
       country: att.country,
       city: att.city,
       lastDipTime: 0,
+      lastBroadcastTime: 0,
       dipIntervals: [],
       continuousDips: 0,
+      isBot: false,
       lastCommentTime: 0,
     };
     this.sockets.set(ws, meta);
@@ -480,6 +561,11 @@ export class GlobalWarDO extends DurableObject<Env> {
         return;
       }
 
+      if (data.type === 'delete_comment') {
+        await this.handleDeleteComment(data.ts, data.key);
+        return;
+      }
+
       if (data.type === 'cheese') {
         this.handleCheeseTap(ws);
         return;
@@ -489,40 +575,34 @@ export class GlobalWarDO extends DurableObject<Env> {
         const meta = this.metaFor(ws);
         if (!meta) return;
 
-        const count = Math.max(1, Math.min(typeof data.count === 'number' ? Math.floor(data.count) : 1, 100));
+        const count = 1; // Strict: 1 WebSocket message = 1 single dip. Ignore any client count spoofing.
         const now = Date.now();
 
-        // 0. Slow-Lane Cadence Gates (30s visual dip, 10min scoreboard count)
+        // 0. Slow-Lane Cadence Gates: 1 official dip + bubble every 30s (gently raises totals over time)
         let countsTowardsScore = true;
         if (SLOW_LANE_IPS.has(meta.ip)) {
           const slowIpState = this.ipStateFor(meta.ip);
           const lastSlow = slowIpState.lastSlowDipTime || 0;
           if (lastSlow > 0 && now - lastSlow < SLOW_LANE_INTERVAL_MS) {
-            // Still in 30s cooldown — drop silently
+            // Drop rapid spam faster than 30s
             return;
           }
           slowIpState.lastSlowDipTime = now;
-
-          const lastScore = slowIpState.lastSlowScoreTime || 0;
-          if (lastScore > 0 && now - lastScore < SLOW_LANE_SCORE_INTERVAL_MS) {
-            countsTowardsScore = false; // visual animation only, no score increment
-          } else {
-            slowIpState.lastSlowScoreTime = now;
-          }
+          countsTowardsScore = true; // Slowly contributes +1 point every 30s!
         }
 
         const interval = meta.lastDipTime > 0 ? now - meta.lastDipTime : Infinity;
 
-        // 1. Hard Physical Animation Gate (drop single clicks faster than MIN_DIP_INTERVAL_MS)
-        if (count === 1 && interval < MIN_DIP_INTERVAL_MS) {
+        // 1. Hard Physical Animation Gate (drop all clicks faster than MIN_DIP_INTERVAL_MS 2000ms)
+        if (interval < MIN_DIP_INTERVAL_MS) {
           return;
         }
 
         const ipState = this.ipStateFor(meta.ip);
 
-        // 2. Check if IP is permanently flagged as a bot
+        // 2. Check if IP is permanently flagged as a bot (visual dips only, no score impact)
         if (ipState && ipState.permanentBot) {
-          return;
+          countsTowardsScore = false;
         }
 
         // 3. Check Option A: Human 3-Minute Cooldown Penalty Box

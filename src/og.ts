@@ -8,14 +8,15 @@ import type { Env } from './durable_object';
 const BUNGEE_SHADE_URL = 'https://cdn.jsdelivr.net/fontsource/fonts/bungee-shade@latest/latin-400-normal.ttf';
 const SPACE_URL  = 'https://cdn.jsdelivr.net/fontsource/fonts/space-mono@latest/latin-700-normal.ttf';
 
-let FONTS: { name: string; data: ArrayBuffer; style: string; weight: number }[] | null = null;
+type FontItem = { name: string; data: ArrayBuffer; style: 'normal' | 'italic'; weight: 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900 };
+let FONTS: FontItem[] | null = null;
 async function loadFonts() {
   if (FONTS) return FONTS;
   const [bungeeShade, space] = await Promise.all([
     fetch(BUNGEE_SHADE_URL).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
     fetch(SPACE_URL).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null),
   ]);
-  const fonts: typeof FONTS = [];
+  const fonts: FontItem[] = [];
   if (bungeeShade) fonts.push({ name: 'Bungee Shade', data: bungeeShade, style: 'normal', weight: 400 });
   if (space)  fonts.push({ name: 'Space Mono', data: space, style: 'normal', weight: 700 });
   FONTS = fonts;
