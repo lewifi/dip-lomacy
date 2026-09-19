@@ -39,7 +39,9 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
     );
   /* Perspective effect on the planks */
   transform-origin: 50% 0%;
-  transform: perspective(600px) rotateX(25deg);
+  transform: perspective(600px) rotateX(25deg) translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   z-index:0;
 }
 /* Table edge highlight */
@@ -51,7 +53,12 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
 }
 
 /* ---- Splash canvas ---- */
-#splash{ position:absolute; inset:0; z-index:2; pointer-events:none; display:block; }
+#splash{
+  position:absolute; inset:0; z-index:2; pointer-events:none; display:block;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
 
 /* ---- Header (unified top block) ---- */
 .header{
@@ -110,6 +117,9 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px);
   white-space:nowrap;
   z-index:25;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
 .dip-bubble.tendie-bubble{ border:2px solid #d97706; color:#b45309; box-shadow:0 6px 20px rgba(217,119,6,0.25); }
 .dip-bubble.dimmie-bubble{ border:2px solid #dc2626; color:#b91c1c; box-shadow:0 6px 20px rgba(220,38,38,0.25); }
@@ -137,6 +147,9 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px);
   transition:transform .18s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow .18s ease;
   min-width:130px;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
 }
 .tendie-pill{
   background:rgba(254, 243, 199, 0.95);
@@ -212,39 +225,93 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
 .stages{
   position:absolute; inset:0; z-index:3;
   display:grid; grid-template-columns:1fr 1fr;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .stage{
   display:flex; align-items:center; justify-content:center;
   cursor:pointer; position:relative;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
 }
 .stage:hover{ background:rgba(255,255,255,.04); }
-.stage:active{ background:rgba(255,255,255,.08); }
+@media (hover: hover) {
+  .stage:active{ background:rgba(255,255,255,.08); }
+}
 
 .svg-wrap{
   position:relative; width:min(72vh, 600px, 46vw); pointer-events:none;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
 }
-.svg-wrap svg{ width:100%; height:auto; display:block; overflow:visible; }
+.svg-wrap svg{ width:100%; height:auto; display:block; overflow:visible; -webkit-tap-highlight-color: transparent; }
 
 /* ---- The Ringmaster (Cheesey) — co-registered on the shared 2160x1672 canvas ---- */
 .ringmaster{
   position:absolute; inset:0; z-index:4; pointer-events:none;
   display:flex; align-items:center; justify-content:center;
+  -webkit-tap-highlight-color: transparent;
 }
-.ringmaster > svg{ width:min(72vh, 600px, 46vw); height:auto; display:block; overflow:visible; transform:translateY(16%); }
+.ringmaster > svg{
+  width:min(72vh, 600px, 46vw); height:auto; display:block; overflow:visible;
+  transform:translateY(16%) translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  will-change: transform;
+  -webkit-tap-highlight-color: transparent;
+}
 /* Jump pivots from Cheesey's own feet, wherever he sits on the canvas.
    pointer-events:auto so a tap on his body is caught here (SVG hit-tests only
    painted pixels) instead of falling through to the Tendie stage behind him. */
-.ringmaster .cheese-rotor{ transform-box:fill-box; transform-origin:50% 100%; pointer-events:auto; cursor:pointer; }
-@keyframes cheeseHop{
-  0%   { transform:translateY(0)    scaleX(1)    scaleY(1); }
-  25%  { transform:translateY(0)    scaleX(1.07) scaleY(0.90); }  /* fat squash */
-  50%  { transform:translateY(-7%)  scaleX(0.96) scaleY(1.05); }  /* slight hop */
-  72%  { transform:translateY(0)    scaleX(1.06) scaleY(0.93); }  /* land squash */
-  100% { transform:translateY(0)    scaleX(1)    scaleY(1); }
+.ringmaster .cheese-rotor{
+  transform-box:fill-box; transform-origin:50% 100%; pointer-events:auto; cursor:pointer;
+  -webkit-tap-highlight-color: transparent;
 }
-.ringmaster.jumping .cheese-rotor{ animation:cheeseHop .4s ease-out; }
+@keyframes cheeseHop{
+  0%   { transform:translateY(16%)   scaleX(1)    scaleY(1); }
+  25%  { transform:translateY(16%)   scaleX(1.07) scaleY(0.90); }  /* fat squash */
+  50%  { transform:translateY(9%)    scaleX(0.96) scaleY(1.05); }  /* slight hop */
+  72%  { transform:translateY(16%)   scaleX(1.06) scaleY(0.93); }  /* land squash */
+  100% { transform:translateY(16%)   scaleX(1)    scaleY(1); }
+}
+.ringmaster.jumping > svg{ animation:cheeseHop .4s ease-out; transform-origin:50% 84%; }
 @media (max-width:768px), (orientation:portrait){
-  .ringmaster > svg{ width:min(50vh, 380px, 90vw); }
+  .ringmaster { display: none !important; }
+}
+
+@media (max-width: 768px), (pointer: coarse) {
+  .dip-bubble {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+  }
+  .faction-pill {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .tendie-pill {
+    background: rgba(254, 243, 199, 0.98) !important;
+  }
+  .dimmie-pill {
+    background: rgba(254, 226, 226, 0.98) !important;
+  }
+  .weekly-wins-banner, .pull-refresh-indicator, .sauce-badge, .menu-card, .live-pill, .airlock-dialog, .modal-backdrop {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .pull-refresh-indicator {
+    background: rgba(30, 18, 8, 0.98) !important;
+  }
+  .live-pill {
+    background: rgba(255, 255, 255, 0.95) !important;
+  }
+  .airlock-dialog {
+    background: rgba(255, 255, 255, 0.98) !important;
+  }
+  .modal-backdrop {
+    background: rgba(0, 0, 0, 0.85) !important;
+  }
 }
 
 /* ---- Pull to refresh indicator ---- */
@@ -374,19 +441,27 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
   .svg-wrap {
     width: min(23vh, 185px, 62vw);
   }
-  .faction-label {
-    position: absolute;
-    font-size: 11px;
-    letter-spacing: 2px;
-    padding: 3px 12px;
+  .faction-pill {
+    padding: 5px 16px;
+    min-width: 104px;
+    border-radius: 20px;
   }
-  /* Push labels to the outer edges so the centre stays clear for Cheesey */
-  #stageTendie .faction-label {
-    top: 44px;
+  .pill-name {
+    font-size: 12px;
+    letter-spacing: 1.5px;
+  }
+  .pill-score {
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+  /* Push pills to outer edges on mobile vertical stack so sauce tubs & Cheesey stay completely clear */
+  #stageTendie .faction-pill {
+    top: 10px;
     bottom: auto;
   }
-  #stageDimmie .faction-label {
-    bottom: 2px;
+  #stageDimmie .faction-pill {
+    bottom: 8px;
+    top: auto;
   }
   .alltime {
     position: absolute;
@@ -481,7 +556,7 @@ body{ font-family:system-ui,sans-serif; user-select:none; -webkit-user-select:no
 
 .chat-card{ display:flex; flex-direction:column; max-height:78vh; }
 .chat-del{
-  margin-left:auto; display:none; cursor:pointer;
+  display:none; cursor:pointer;
   background:rgba(220,38,38,0.14); border:1px solid rgba(220,38,38,0.4);
   color:#ef4444; border-radius:6px; width:20px; height:20px; line-height:1;
   font-size:14px; font-weight:700; padding:0; flex:0 0 auto;
@@ -505,12 +580,12 @@ body.mod-on .chat-del{ display:block; }
 }
 @keyframes chatIn{ from{ opacity:0; transform:translateY(-4px);} to{ opacity:1; transform:none;} }
 .chat-line-header{
-  display:flex; justify-content:space-between; align-items:center; width:100%;
+  display:flex; align-items:center; gap:8px; width:100%;
 }
 .chat-handle{ font-weight:700; font-size:11.5px; letter-spacing:.5px; text-transform:uppercase; }
 .chat-handle.tendie{ color:#d97706; }
 .chat-handle.dimmie{ color:#dc2626; }
-.chat-time{ font-size:9.5px; color:rgba(255,255,255,0.38); font-family:"Space Mono",monospace; }
+.chat-time{ margin-left:auto; font-size:9.5px; color:rgba(255,255,255,0.38); font-family:"Space Mono",monospace; }
 .chat-text{ font-size:12.5px; line-height:1.42; color:rgba(255,255,255,0.92); word-break:break-word; }
 .chat-empty{ color:var(--mut,#b99b6e); text-align:center; font-size:12px; padding:24px 0; opacity:.7; }
 .chat-input-row{ display:flex; gap:8px; padding-top:8px; border-top:1px solid rgba(0,0,0,0.08); }
@@ -1241,19 +1316,31 @@ function bumpStageScore(side) {
   const badge = document.getElementById(side === 'tendie' ? 'tendieScoreBadge' : 'dimmieScoreBadge');
   if (!badge) return;
   badge.classList.remove('bump');
-  void badge.offsetWidth; // reflow
-  badge.classList.add('bump');
+  requestAnimationFrame(() => {
+    badge.classList.add('bump');
+  });
   setTimeout(() => badge.classList.remove('bump'), 220);
 }
 
-// ---- True Real-Score Percentage Engine ----
+// ---- Dynamic Tug-of-War Percentage Engine (Elastic Resistance) ----
 let currentWeeklyScores = { tendie: 0, dimmie: 0 };
+let currentWarPosition = 50; // 0 = 100% Dimmie, 50 = Dead Center, 100 = 100% Tendie
+
+// 1.0% flat in battleground / underdog comeback; diminishing returns in deep territory
+function getDipDelta(pos, side) {
+  if (side === 'tendie') {
+    if (pos < 75) return 1.0; // Underdog or battleground: full 1% per tap
+    if (pos < 90) return 0.5; // Deep lead: 2 taps per 1%
+    return 0.25;              // Red zone: 4 taps per 1%
+  } else {
+    if (pos > 25) return 1.0; // Underdog or battleground: full 1% per tap
+    if (pos > 10) return 0.5; // Deep lead: 2 taps per 1%
+    return 0.25;              // Red zone: 4 taps per 1%
+  }
+}
 
 function renderWarBar() {
-  const wt = currentWeeklyScores.tendie || 0;
-  const wd = currentWeeklyScores.dimmie || 0;
-  const total = wt + wd;
-  const tPct = total === 0 ? 50 : Math.max(1, Math.min(99, Math.round((wt / total) * 100)));
+  const tPct = Math.max(1, Math.min(99, Math.round(currentWarPosition)));
   const dPct = 100 - tPct;
 
   const warT = document.getElementById('warT');
@@ -1367,8 +1454,9 @@ function ringmasterJump(){
   rmLastJump = now;
   playCheeseyBoing();
   ringmasterEl.classList.remove('jumping');
-  void ringmasterEl.offsetWidth; // reflow to restart the animation
-  ringmasterEl.classList.add('jumping');
+  requestAnimationFrame(() => {
+    ringmasterEl.classList.add('jumping');
+  });
   ringmasterEl.addEventListener('animationend', () => ringmasterEl.classList.remove('jumping'), { once:true });
 }
 // Tapping Cheesey himself just makes him hop — never a dip — and the hop is
@@ -1452,6 +1540,15 @@ let lastRemoteDip = { tendie: 0, dimmie: 0 };
 function triggerRemoteDip(side, country, city) {
   spawnDipBubble(side, country, city, false);
   addTickerDip(side, country, city);
+
+  // Live remote dips nudge the bar with elastic resistance
+  const delta = getDipDelta(currentWarPosition, side);
+  if (side === 'tendie') {
+    currentWarPosition = Math.min(99, currentWarPosition + delta);
+  } else {
+    currentWarPosition = Math.max(1, currentWarPosition - delta);
+  }
+  renderWarBar();
 
   const now = performance.now();
   if (now - lastRemoteDip[side] > 320) {
@@ -1602,9 +1699,16 @@ tick();
 let lastUserDipTime = 0;
 function handleUserDip(side){
   const now = Date.now();
-  if(now - lastUserDipTime < 2000) return; // 2.0-second rate limit
+  if(now - lastUserDipTime < 500) return; // 0.5-second rate limit
   lastUserDipTime = now;
   currentWeeklyScores[side] = (currentWeeklyScores[side] || 0) + 1;
+  // Dynamic elastic push: 1% flat in middle, resistance in deep red zone
+  const delta = getDipDelta(currentWarPosition, side);
+  if (side === 'tendie') {
+    currentWarPosition = Math.min(99, currentWarPosition + delta);
+  } else {
+    currentWarPosition = Math.max(1, currentWarPosition - delta);
+  }
   renderWarBar();
   playDipSound(side);
   spawnDipBubble(side, '', '', true);
@@ -1969,7 +2073,7 @@ function updateScoreUI(d){
   currentWeeklyScores.tendie = wt;
   currentWeeklyScores.dimmie = wd;
   if (d.war_position !== undefined) {
-    serverWarPosition = d.war_position;
+    currentWarPosition = d.war_position;
   }
   renderWarBar();
 
@@ -2172,6 +2276,19 @@ function renderComment(handle, text, side, ts, isLive = false){
   time.textContent = fmtChatTime(commentTs);
 
   header.append(h, time);
+
+  // Moderator delete button (hidden unless body.mod-on)
+  line.dataset.ts = String(commentTs);
+  const del = document.createElement('button');
+  del.className = 'chat-del';
+  del.textContent = '×';
+  del.title = 'Delete comment';
+  del.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if(!MOD_KEY) return;
+    if(wsReady){ try{ ws.send(JSON.stringify({type:'delete_comment', ts: commentTs, key: MOD_KEY})); }catch(err){} }
+  });
+  header.appendChild(del);
 
   const t = document.createElement('div');
   t.className = 'chat-text';

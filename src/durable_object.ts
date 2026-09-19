@@ -49,6 +49,7 @@ interface IpRateState {
   tokens: number;
   lastRefill: number;
   recentDips: number[]; // timestamps within last 60s
+  windowDips: number[]; // timestamps within last 5 minutes (for stamina/fatigue curve)
   activeSockets: number;
   permanentBot: boolean; // hard kill for obvious robotic scripts
   cooldownUntil: number; // 3-minute auto-decay penalty box for hyperactive humans
@@ -81,11 +82,11 @@ function hashIp(ip: string): string {
   return (h >>> 0).toString(36).slice(0, 6);
 }
 
-// Rate limiting parameters (2-second rate limit profile)
-const BUCKET_CAPACITY = 3;
-const TOKEN_REFILL_RATE = 0.5; // 1 token every 2 seconds
-const MIN_DIP_INTERVAL_MS = 2000; // 2.0-second gate per connection
-const MAX_DIPS_PER_MINUTE = 30; // 30 dips per minute max
+// Rate limiting parameters (0.5-second rate limit profile)
+const BUCKET_CAPACITY = 6;
+const TOKEN_REFILL_RATE = 2.0; // 2 tokens per second (1 every 0.5s)
+const MIN_DIP_INTERVAL_MS = 500; // 0.5-second gate per connection
+const MAX_DIPS_PER_MINUTE = 120; // 120 dips per minute max (2/sec)
 const MAX_CONCURRENT_SOCKETS_PER_IP = 6;
 const HUMAN_COOLDOWN_MS = 5 * 1000; // 5-second short breather if capacity fully exhausted
 
@@ -96,6 +97,51 @@ const SLOW_LANE_IPS = new Set([
   '35.236.214.210',
 ]);
 const SLOW_LANE_INTERVAL_MS = 120 * 1000; // 120 seconds (2 minutes)
+
+// Tug-of-war elastic curve: full 1.0% in the battleground, diminishing returns in deep territory
+function getDipDelta(pos: number, side: 'tendie' | 'dimmie'): number {
+  if (side === 'tendie') {
+    if (pos < 75) return 1.0; // Underdog or battleground: full 1% per click
+    if (pos < 90) return 0.5; // Deep lead: 2 clicks per 1%
+    return 0.25;              // Red zone: 4 clicks per 1%
+  } else {
+    if (pos > 25) return 1.0; // Underdog or battleground: full 1% per click
+    if (pos > 10) return 0.5; // Deep lead: 2 clicks per 1%
+    return 0.25;              // Red zone: 4 clicks per 1%
+  }
+}
+
+// Curated diverse pool of real-world cities for the automated ambient heartbeat
+const HEARTBEAT_LOCATIONS = [
+  { city: 'Melbourne', country: 'AU' },
+  { city: 'Sydney', country: 'AU' },
+  { city: 'Brisbane', country: 'AU' },
+  { city: 'Perth', country: 'AU' },
+  { city: 'Adelaide', country: 'AU' },
+  { city: 'Auckland', country: 'NZ' },
+  { city: 'Wellington', country: 'NZ' },
+  { city: 'Tokyo', country: 'JP' },
+  { city: 'Osaka', country: 'JP' },
+  { city: 'Seoul', country: 'KR' },
+  { city: 'Singapore', country: 'SG' },
+  { city: 'Taipei', country: 'TW' },
+  { city: 'London', country: 'GB' },
+  { city: 'Manchester', country: 'GB' },
+  { city: 'Edinburgh', country: 'GB' },
+  { city: 'Dublin', country: 'IE' },
+  { city: 'Paris', country: 'FR' },
+  { city: 'Berlin', country: 'DE' },
+  { city: 'Amsterdam', country: 'NL' },
+  { city: 'Stockholm', country: 'SE' },
+  { city: 'New York', country: 'US' },
+  { city: 'Chicago', country: 'US' },
+  { city: 'Los Angeles', country: 'US' },
+  { city: 'Austin', country: 'US' },
+  { city: 'Seattle', country: 'US' },
+  { city: 'Toronto', country: 'CA' },
+  { city: 'Vancouver', country: 'CA' },
+  { city: 'Montreal', country: 'CA' },
+];
 
 export class GlobalWarDO extends DurableObject<Env> {
   // All-time totals
@@ -121,6 +167,7 @@ export class GlobalWarDO extends DurableObject<Env> {
   private comments: ChatComment[] = [];
   private dirty: boolean = false;
   private broadcastScheduled: boolean = false;
+  private heartbeatInProgress: boolean = false;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -333,7 +380,7 @@ export class GlobalWarDO extends DurableObject<Env> {
       dimmie_dips: this.dimmieDips,
       weekly_tendie: this.weeklyTendie,
       weekly_dimmie: this.weeklyDimmie,
-      war_position: Math.round(this.warPosition),
+      war_position: Number(this.warPosition.toFixed(2)),
       weeks_won_tendie: this.weeksWonTendie,
       weeks_won_dimmie: this.weeksWonDimmie,
       week_ends: this.weekStart + WEEK_MS,
@@ -355,6 +402,11 @@ export class GlobalWarDO extends DurableObject<Env> {
       // Cron-triggered: send weekly reminders to the losing side, if in window.
       if (request.method === 'POST' && url.pathname === '/reminders/run') {
         return this.runReminders();
+      }
+
+      // Cron-triggered: ambient heartbeat dip with jitter and global locations
+      if (request.method === 'POST' && url.pathname === '/internal/heartbeat') {
+        return this.handleHeartbeat();
       }
 
       // Admin trigger: force instant live page refresh on all connected clients
@@ -381,22 +433,10 @@ export class GlobalWarDO extends DurableObject<Env> {
 
     this.ctx.acceptWebSocket(server);
 
-    let ipState = this.ipStates.get(ip);
-    if (!ipState) {
-      ipState = {
-        tokens: BUCKET_CAPACITY,
-        lastRefill: Date.now(),
-        recentDips: [],
-        activeSockets: 1,
-        permanentBot: false,
-        cooldownUntil: 0,
-      };
-      this.ipStates.set(ip, ipState);
-    } else {
-      ipState.activeSockets += 1;
-      // Reset any accidental historical permanent ban on reconnect
-      ipState.permanentBot = false;
-    }
+    const ipState = this.ipStateFor(ip);
+    ipState.activeSockets += 1;
+    // Reset any accidental historical permanent ban on reconnect
+    ipState.permanentBot = false;
 
     this.sockets.set(server, {
       ip,
@@ -542,6 +582,7 @@ export class GlobalWarDO extends DurableObject<Env> {
         tokens: BUCKET_CAPACITY,
         lastRefill: Date.now(),
         recentDips: [],
+        windowDips: [],
         activeSockets: 1,
         permanentBot: false,
         cooldownUntil: 0,
@@ -578,22 +619,26 @@ export class GlobalWarDO extends DurableObject<Env> {
         const count = 1; // Strict: 1 WebSocket message = 1 single dip. Ignore any client count spoofing.
         const now = Date.now();
 
-        // 0. Slow-Lane Cadence Gates: 1 official dip + bubble every 30s (gently raises totals over time)
+        // 0. Slow-Lane Cadence Gates: 1 official dip every 120s for known bots and flagged cities (e.g. Santiago)
         let countsTowardsScore = true;
-        if (SLOW_LANE_IPS.has(meta.ip)) {
+        const isSlowLane =
+          SLOW_LANE_IPS.has(meta.ip) ||
+          (typeof meta.city === 'string' && meta.city.trim().toLowerCase() === 'santiago');
+
+        if (isSlowLane) {
           const slowIpState = this.ipStateFor(meta.ip);
           const lastSlow = slowIpState.lastSlowDipTime || 0;
           if (lastSlow > 0 && now - lastSlow < SLOW_LANE_INTERVAL_MS) {
-            // Drop rapid spam faster than 30s
+            // Drop rapid spam faster than slow lane interval (120s)
             return;
           }
           slowIpState.lastSlowDipTime = now;
-          countsTowardsScore = true; // Slowly contributes +1 point every 30s!
+          countsTowardsScore = true; // Slowly contributes +1 point every 120s
         }
 
         const interval = meta.lastDipTime > 0 ? now - meta.lastDipTime : Infinity;
 
-        // 1. Hard Physical Animation Gate (drop all clicks faster than MIN_DIP_INTERVAL_MS 2000ms)
+        // 1. Hard Physical Animation Gate (drop all clicks faster than MIN_DIP_INTERVAL_MS)
         if (interval < MIN_DIP_INTERVAL_MS) {
           return;
         }
@@ -615,20 +660,37 @@ export class GlobalWarDO extends DurableObject<Env> {
             ipState.cooldownUntil = 0;
             ipState.tokens = BUCKET_CAPACITY;
             ipState.recentDips = [];
+            if (!ipState.windowDips) ipState.windowDips = [];
             meta.continuousDips = 0;
           }
         }
 
-        // 4. Token Bucket & Velocity Rate Limiting
+        // 4. Token Bucket & Velocity Rate Limiting + Stamina/Fatigue Curve
+        let fatigueMultiplier = 1.0;
         if (ipState) {
           const elapsedSec = (now - ipState.lastRefill) / 1000;
           ipState.tokens = Math.min(BUCKET_CAPACITY, ipState.tokens + elapsedSec * TOKEN_REFILL_RATE);
           ipState.lastRefill = now;
 
-          // Prune timestamps older than 60s
+          // Prune timestamps
           ipState.recentDips = ipState.recentDips.filter(t => now - t < 60000);
+          if (!ipState.windowDips) ipState.windowDips = [];
+          ipState.windowDips = ipState.windowDips.filter(t => now - t < 300000); // 5-minute rolling window
+          const dipsInWindow = ipState.windowDips.length;
 
-          // If out of tokens or exceeding MAX_DIPS_PER_MINUTE, trigger human cooldown
+          // Stamina/Fatigue:
+          // 0–40 dips in 5m: Fresh casual player. Full 2/sec burst, 100% tug-of-war strength.
+          // 41–100 dips in 5m: Tired grinder. Throttled to max 1 click/sec, 50% strength.
+          // 100+ dips in 5m: Exhausted / bot. Throttled to max 1 click every 3s, 25% strength.
+          if (dipsInWindow >= 100) {
+            if (interval < 3000) return; // Drop rapid clicks faster than 3s when exhausted
+            fatigueMultiplier = 0.25;
+          } else if (dipsInWindow >= 40) {
+            if (interval < 1000) return; // Drop rapid clicks faster than 1s during fatigue
+            fatigueMultiplier = 0.5;
+          }
+
+          // If out of tokens or exceeding MAX_DIPS_PER_MINUTE, trigger short cooldown
           if (ipState.tokens < count || ipState.recentDips.length + count > MAX_DIPS_PER_MINUTE) {
             ipState.cooldownUntil = now + HUMAN_COOLDOWN_MS;
             return;
@@ -637,6 +699,7 @@ export class GlobalWarDO extends DurableObject<Env> {
           ipState.tokens -= count;
           for (let i = 0; i < count; i++) {
             ipState.recentDips.push(now);
+            ipState.windowDips.push(now);
           }
         }
 
@@ -647,7 +710,7 @@ export class GlobalWarDO extends DurableObject<Env> {
           meta.continuousDips = count;
         }
 
-        // Over 350 rapid continuous clicks without taking a breath -> 5s breather
+        // Over 350 rapid continuous clicks without taking a breath -> short breather
         if (meta.continuousDips > 350) {
           if (ipState) ipState.cooldownUntil = now + HUMAN_COOLDOWN_MS;
           meta.continuousDips = 0;
@@ -681,16 +744,27 @@ export class GlobalWarDO extends DurableObject<Env> {
         // Check for rollover before counting
         this.maybeRollover();
 
+        // 7. 99% Mercy Rule: When a faction has completely squashed the other (sitting at 99%),
+        // further clicks for the dominant side do NOT count to score or move the bar.
+        // The underdog must push back first.
+        if (
+          (data.side === 'tendie' && this.warPosition >= 99) ||
+          (data.side === 'dimmie' && this.warPosition <= 1)
+        ) {
+          countsTowardsScore = false;
+        }
+
         // Commit dip to both all-time and weekly totals if counted
         if (countsTowardsScore) {
+          const delta = count * getDipDelta(this.warPosition, data.side) * fatigueMultiplier;
           if (data.side === 'tendie') {
             this.tendieDips += count;
             this.weeklyTendie += count;
-            this.warPosition = Math.min(100, this.warPosition + count * 0.4);
+            this.warPosition = Math.min(99, this.warPosition + delta);
           } else {
             this.dimmieDips += count;
             this.weeklyDimmie += count;
-            this.warPosition = Math.max(0, this.warPosition - count * 0.4);
+            this.warPosition = Math.max(1, this.warPosition - delta);
           }
 
           if (meta.country && meta.country !== 'XX') {
@@ -708,21 +782,27 @@ export class GlobalWarDO extends DurableObject<Env> {
         // DEBUG: per-dip trace for `wrangler tail` — source is a hashed IP (no PII).
         console.log(`DIP ${data.side} count=${count} counted=${countsTowardsScore} ${meta.country} ${hashIp(meta.ip)}`);
 
-        // Broadcast instantaneous live dip event to all other active clients
-        const worldDipPayload = JSON.stringify({
-          type: 'world_dip',
-          side: data.side,
-          count: count,
-          country: meta.country,
-          city: meta.city,
-        });
+        // Broadcast instantaneous live dip event to all other active clients ONLY if:
+        // 1. It legitimately counted towards the score (never broadcast for 99% blowout or bot hits)
+        // 2. It is not from the slow-lane / Santiago (keep bot/script clicks completely invisible to other players)
+        // 3. Rate-limit remote broadcasts to max 1 per 1.5s per IP so rapid clickers don't flood the arena
+        if (countsTowardsScore && !isSlowLane && (now - meta.lastBroadcastTime >= 1500)) {
+          meta.lastBroadcastTime = now;
+          const worldDipPayload = JSON.stringify({
+            type: 'world_dip',
+            side: data.side,
+            count: count,
+            country: meta.country,
+            city: meta.city,
+          });
 
-        for (const socket of this.ctx.getWebSockets()) {
-          if (socket !== ws) {
-            try {
-              socket.send(worldDipPayload);
-            } catch {
-              // Ignore stale socket
+          for (const socket of this.ctx.getWebSockets()) {
+            if (socket !== ws) {
+              try {
+                socket.send(worldDipPayload);
+              } catch {
+                // Ignore stale socket
+              }
             }
           }
         }
@@ -854,28 +934,127 @@ export class GlobalWarDO extends DurableObject<Env> {
     };
   }
 
+  // Ambient heartbeat: runs an organic sequence of dips with human clustering & lulls
+  private async handleHeartbeat(): Promise<Response> {
+    if (this.heartbeatInProgress) {
+      return new Response(JSON.stringify({ ok: true, skipped: 'in_progress' }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    this.heartbeatInProgress = true;
+    const results = [];
+    const maxDips = Math.floor(4 + Math.random() * 4); // 4 to 7 dips per minute
+    let elapsedMs = 0;
+
+    try {
+      for (let i = 0; i < maxDips; i++) {
+        // Organic Poisson interval distribution:
+        // 25% quick cluster / double-tap (2–4.5s)
+        // 50% medium human gap (6–11s)
+        // 25% natural lull (13–19s)
+        const roll = Math.random();
+        let intervalMs: number;
+        if (roll < 0.25) {
+          intervalMs = Math.floor(2000 + Math.random() * 2500);
+        } else if (roll < 0.75) {
+          intervalMs = Math.floor(6000 + Math.random() * 5000);
+        } else {
+          intervalMs = Math.floor(13000 + Math.random() * 6000);
+        }
+
+        // Hard cap at 52s so the sequence finishes cleanly before the next minute-cron
+        if (elapsedMs + intervalMs > 52000) {
+          break;
+        }
+
+        elapsedMs += intervalMs;
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+
+        // 50/50 balance, gently leaning towards underdog if one side takes deep lead
+        let side: 'tendie' | 'dimmie' = Math.random() < 0.5 ? 'tendie' : 'dimmie';
+        if (this.warPosition >= 80) side = 'dimmie';
+        else if (this.warPosition <= 20) side = 'tendie';
+
+        const loc = HEARTBEAT_LOCATIONS[Math.floor(Math.random() * HEARTBEAT_LOCATIONS.length)];
+
+        this.maybeRollover();
+
+        if (side === 'tendie') {
+          this.tendieDips += 1;
+          this.weeklyTendie += 1;
+          this.warPosition = Math.min(99, this.warPosition + getDipDelta(this.warPosition, 'tendie'));
+        } else {
+          this.dimmieDips += 1;
+          this.weeklyDimmie += 1;
+          this.warPosition = Math.max(1, this.warPosition - getDipDelta(this.warPosition, 'dimmie'));
+        }
+
+        if (loc.country && loc.country !== 'XX') {
+          this.countryDips[loc.country] = (this.countryDips[loc.country] || 0) + 1;
+          if (loc.city) {
+            const cityKey = `${loc.city}, ${loc.country}`;
+            this.cityDips[cityKey] = (this.cityDips[cityKey] || 0) + 1;
+          }
+        }
+
+        this.dirty = true;
+        await this.flushState();
+
+        // Broadcast instantaneous live dip to all connected arena tabs
+        const worldDipPayload = JSON.stringify({
+          type: 'world_dip',
+          side,
+          count: 1,
+          country: loc.country,
+          city: loc.city,
+        });
+        this.broadcast(worldDipPayload);
+
+        results.push({ side, loc, intervalMs });
+        console.log(`ORGANIC DIP ${side} ${loc.city}, ${loc.country} (+${intervalMs}ms)`);
+      }
+    } finally {
+      this.heartbeatInProgress = false;
+    }
+
+    return new Response(JSON.stringify({ ok: true, dips: results, totalTimeMs: elapsedMs }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  private async flushState() {
+    if (!this.dirty) return;
+    this.dirty = false;
+
+    await this.ctx.storage.put('tendie_dips', this.tendieDips);
+    await this.ctx.storage.put('dimmie_dips', this.dimmieDips);
+    await this.ctx.storage.put('weekly_tendie', this.weeklyTendie);
+    await this.ctx.storage.put('weekly_dimmie', this.weeklyDimmie);
+    await this.ctx.storage.put('war_position', this.warPosition);
+    await this.ctx.storage.put('country_dips', this.countryDips);
+    await this.ctx.storage.put('city_dips', this.cityDips);
+
+    const payload = this.buildPayload('tick');
+    this.broadcast(payload);
+  }
+
   private scheduleBroadcast() {
     if (this.broadcastScheduled) return;
     this.broadcastScheduled = true;
 
     // Throttle broadcast fan-out to ~10 Hz (100ms aggregation window)
-    setTimeout(async () => {
-      this.broadcastScheduled = false;
-      if (!this.dirty) return;
-      this.dirty = false;
-
-      // Save to storage
-      await this.ctx.storage.put('tendie_dips', this.tendieDips);
-      await this.ctx.storage.put('dimmie_dips', this.dimmieDips);
-      await this.ctx.storage.put('weekly_tendie', this.weeklyTendie);
-      await this.ctx.storage.put('weekly_dimmie', this.weeklyDimmie);
-      await this.ctx.storage.put('war_position', this.warPosition);
-      await this.ctx.storage.put('country_dips', this.countryDips);
-      await this.ctx.storage.put('city_dips', this.cityDips);
-
-      const payload = this.buildPayload('tick');
-      this.broadcast(payload);
-    }, 100);
+    const p = new Promise<void>((resolve) => {
+      setTimeout(async () => {
+        this.broadcastScheduled = false;
+        try {
+          await this.flushState();
+        } finally {
+          resolve();
+        }
+      }, 100);
+    });
+    this.ctx.waitUntil(p);
   }
 
   private broadcast(payload: string) {

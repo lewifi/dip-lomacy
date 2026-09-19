@@ -97,11 +97,19 @@ app.all('*', async (c) => {
   return c.text('Not found', 404);
 });
 
-// Cron trigger → ask the DO to fire weekly reminders (it self-gates on window/side).
-async function scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext) {
+// Cron trigger → ambient heartbeat every minute, plus hourly weekly reminders.
+async function scheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
   const id = env.GLOBAL_WAR.idFromName('global-war-v1');
   const stub = env.GLOBAL_WAR.get(id);
-  ctx.waitUntil(stub.fetch(new Request('https://dummy/reminders/run', { method: 'POST' })));
+
+  // 1. Every minute: ambient heartbeat with 0-25s jitter & randomized global location
+  await stub.fetch(new Request('https://dummy/internal/heartbeat', { method: 'POST' }));
+
+  // 2. On the hour (minute === 0): run weekly push reminders (self-gates on window/side)
+  const cronDate = new Date(event.scheduledTime);
+  if (cronDate.getUTCMinutes() === 0) {
+    await stub.fetch(new Request('https://dummy/reminders/run', { method: 'POST' }));
+  }
 }
 
 export default { fetch: app.fetch, scheduled };

@@ -15,8 +15,8 @@
     "binding": "ASSETS"
   },
   "triggers": {
-    // Hourly; the DO self-gates to the 36h pre-reset window and losing side.
-    "crons": ["0 * * * *"]
+    // Every minute for ambient heartbeat; hourly reminder self-gates in scheduled().
+    "crons": ["* * * * *"]
   },
   "vars": {
     // VAPID public key is safe to expose. Private key is a secret:

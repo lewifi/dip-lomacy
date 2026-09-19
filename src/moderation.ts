@@ -13,8 +13,9 @@ const MAX_LEN = 140;
 // Hard-block: hate/slurs never reach the feed. Tolerates spacing/leet; the
 // double-letter requirement avoids false positives like "Niger"/"Nigeria".
 const HATE = [
-  /\bn[\s\-_.*+]*[i1!|][\s\-_.*+]*g[\s\-_.*+]*g[\s\-_.*+]*[e3a@][\s\-_.*+]*r?/i,
-  /\bf[a@4][\s\-_.*+]*g[\s\-_.*+]*g[\s\-_.*+]*[o0][\s\-_.*+]*t/i,
+  /\bn+[\s\-_.*+~^]*[i1!|*]+[\s\-_.*+~^]*[g*]+[\s\-_.*+~^]*[g*]+[\s\-_.*+~^]*(?:[e3a@*]+[\s\-_.*+~^]*r*|r+)/i,
+  /\bn+[\s\-_.*+~^]*[i1!|*]+[\s\-_.*+~^]*(?:[g*][\s\-_.*+~^]*){3,}/i,
+  /\bf+[\s\-_.*+~^]*[a@4*]+[\s\-_.*+~^]*[g*]+[\s\-_.*+~^]*[g*]+[\s\-_.*+~^]*(?:[o0*]+[\s\-_.*+~^]*t*|t+|y+)/i,
 ];
 function isHate(t: string): boolean {
   return HATE.some((re) => re.test(t));
@@ -42,8 +43,9 @@ const VULGAR_PATTERNS = [
 
 // Slurs → fully masked (no letters shown).
 const SLUR_PATTERNS = [
-  /\bn[\s\-_.*+]*[i1!|][\s\-_.*+]*g[\s\-_.*+]*g[\s\-_.*+]*[e3a@][\s\-_.*+]*r?/gi,
-  /\bf[a@4][\s\-_.*+]*g[\s\-_.*+]*g[\s\-_.*+]*[o0][\s\-_.*+]*t?/gi,
+  /\bn+[\s\-_.*+~^]*[i1!|*]+[\s\-_.*+~^]*[g*]+[\s\-_.*+~^]*[g*]+[\s\-_.*+~^]*(?:[e3a@*]+[\s\-_.*+~^]*r*|r+)/gi,
+  /\bn+[\s\-_.*+~^]*[i1!|*]+[\s\-_.*+~^]*(?:[g*][\s\-_.*+~^]*){3,}/gi,
+  /\bf+[\s\-_.*+~^]*[a@4*]+[\s\-_.*+~^]*[g*]+[\s\-_.*+~^]*[g*]+[\s\-_.*+~^]*(?:[o0*]+[\s\-_.*+~^]*t*|t+|y+)/gi,
   /\bkike\w*/gi,
   /\bchink(y|ies)\b/gi,
   /\bspic\b/gi,
